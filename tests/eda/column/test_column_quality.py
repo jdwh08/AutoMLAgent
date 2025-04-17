@@ -12,6 +12,9 @@
 #####################################################
 ### BOARD
 
+# TODO(jdwh08): Add tests for partially None values
+# TODO(jdwh08): Add tests for partially NaN values
+
 #####################################################
 ### IMPORTS
 
@@ -27,11 +30,10 @@ from AutoMLAgent.eda.column.column_quality import (
     get_data_quality_for_column_temporal,
 )
 
+
 #####################################################
 ### UNIT TESTS
-
-
-class UnitTestColumnQuality:
+class TestUnitColumnQuality:
     @pytest.fixture
     def basic_float_df(self) -> pl.DataFrame:
         return pl.DataFrame({"col": [1.0, 2.0, 3.0, 4.0, 5.0]})
@@ -107,7 +109,8 @@ class UnitTestColumnQuality:
 
     def test_temporal_outliers_and_variation(self) -> None:
         dates = ["2020-01-01", "2020-01-02", "2020-01-03", "2030-01-01"]
-        df = pl.DataFrame({"col": pl.to_datetime(dates)})
+        df = pl.DataFrame({"col": dates})
+        df = df.with_columns(pl.col("col").str.to_date().alias("col"))
         res = get_data_quality_for_column_temporal(df, "col")
         assert res["outlier_count"] == 1
         assert pytest.approx(res["outlier_rate"], rel=1e-3) == 1 / 4
@@ -115,19 +118,27 @@ class UnitTestColumnQuality:
 
     def test_temporal_uniform_true(self) -> None:
         dates = ["2021-06-01"] * 5
-        df = pl.DataFrame({"col": pl.to_datetime(dates)})
+        df = pl.DataFrame({"col": dates})
+        df = df.with_columns(pl.col("col").str.to_date().alias("col"))
         res = get_data_quality_for_column_temporal(df, "col")
         assert res["outlier_count"] == 0
+        assert pytest.approx(res["outlier_rate"], rel=1e-3) == 0.0
         assert res["has_low_variation"] is True
 
     def test_dispatch_with_column_info_type(self) -> None:
+        """Test to ensure dataframes with multiple types can work."""
         df = pl.DataFrame(
             {
                 "num": [1.0, 2.0, 3.0],
                 "cat": ["a", "a", "b"],
-                "dt": pl.to_datetime(["2020-01-01", "2020-01-02", "2020-01-03"]),
+                "dt": [
+                    "2020-01-01 14:01:33",
+                    "2020-01-02 18:28:28",
+                    "2020-01-03 03:59:07",
+                ],
             }
         )
+        df = df.with_columns(pl.col("dt").str.to_datetime().alias("dt"))
         ci_num = ColumnInfo(name="num", type=ColumnType.INTEGER)
         ci_cat = ColumnInfo(name="cat", type=ColumnType.CATEGORICAL)
         ci_dt = ColumnInfo(name="dt", type=ColumnType.DATETIME)
@@ -139,6 +150,7 @@ class UnitTestColumnQuality:
         assert "outlier_rate" in out_dt
 
     def test_dispatch_unknown_type_returns_empty(self) -> None:
+        """Test to ensure unknown type dispatches empty dict."""
         df = pl.DataFrame({"x": [1, 2, 3]})
         ci = ColumnInfo(name="x", type=ColumnType.UNKNOWN)
         assert get_data_quality_for_column(df, "x", column_info=ci) == {}
