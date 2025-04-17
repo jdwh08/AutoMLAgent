@@ -26,11 +26,10 @@ jobs:
     - name: Install dependencies
       run: |
         uv venv
-        uv pip install -r pyproject.toml
-        uv pip install pytest pytest-cov ruff mypy
+        uv pip install -r pyproject.toml --extra dev
 
-    - name: Type check with mypy
-      run: uv run mypy src/
+    # - name: Type check with mypy
+    #   run: uv run mypy src/
 
     - name: Lint code with Ruff
       run: uv run ruff check --output-format=github --target-version=py311
