@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "AutoMLAgent"
-version = "2025.0.0.1"
+version = "0.0.1"
 description = "Prototype for Agentic AutoML"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,7 +20,7 @@ dependencies = [
     "mlflow>=2.21.2",
     "openai>=1.70.0",
 ]
-license = { "text" = "AGPL-3.0" }
+license = { "text" = "GPL-3.0" }
 license-files = ["LICEN[CS]E*"]
 keywords = ["AutoML", "Machine Learning", "Agents", "AI Agents"]
 classifiers = [
@@ -31,7 +31,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
-  "License :: OSI Approved :: GNU Affero General Public License v3",
+  "License :: OSI Approved :: GNU General Public License v3",
 ]
 
 [project.urls]

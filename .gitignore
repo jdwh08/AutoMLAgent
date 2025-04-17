@@ -3,7 +3,6 @@
 mlruns/
 *.zip
 AutoMLAgent.pdf
-uv.lock
 ui_notes.md
 vllm_model_notes.md
 todo.md

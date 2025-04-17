@@ -2,6 +2,9 @@
 
 Prototype modular, agentic AutoML system for (tabular datasets for now).
 
+[![codecov](https://codecov.io/gh/jdwh08/AutoMLAgent/branch/main/graph/badge.svg)](https://codecov.io/gh/jdwh08/AutoMLAgent)
+ [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
 **Research Question**: Can agents achieve similar levels of performance as
 manual model training on benchmark /  Kaggleish datasets?
 
@@ -97,16 +100,16 @@ such as bias, adversarial datasets, data compliance, etc.
 ### License (and Additional Disclaimers)
 
 This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, version 3 of the
-License.
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
+GNU General Public License for more details.
 
-You should have received a copy of the GNU Affero General Public License
+You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-Go open.
+Go open!

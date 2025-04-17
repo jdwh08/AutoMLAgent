@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install uv
+      run: |
+        python -m pip install --upgrade pip
+        pip install uv
+
+    - name: Install dependencies
+      run: |
+        uv pip install -r pyproject.toml
+        uv pip install pytest pytest-cov ruff mypy
+
+    - name: Type check with mypy
+      run: mypy src/
+
+    - name: Lint code with Ruff
+      run: ruff check --output-format=github --target-version=py311
+
+    - name: Check code formatting
+      run: ruff format --check --diff --target-version=py311
+
+    - name: Test with pytest
+      run: |
+        pytest --junitxml=junit/test-results.xml --cov=src --cov-report=xml --cov-report=html
+
+    - name: Upload JUnit test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: junit-results
+        path: junit/test-results.xml
+
+    - name: Update coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage.xml
+        fail_ci_if_error: true
