@@ -32,7 +32,7 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/jdwh08/Agentic-AutoML.git"
+Repository = "https://github.com/jdwh08/AutoMLAgent.git"
 
 [dependency-groups]
 dev = [
