@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from math import ceil, floor
 
 import mlflow
 import polars as pl
@@ -27,6 +28,10 @@ from AutoMLAgent.dataclass.column_info import ColumnInfo
 from AutoMLAgent.dataclass.column_type import ColumnType
 from AutoMLAgent.eda.column.column_types import get_type_for_column
 from AutoMLAgent.logger.mlflow_logger import logger
+
+#####################################################
+### SETTINGS
+LOW_VARIATION_THRESHOLD = 0.05  # x% not majority class
 
 #####################################################
 ### CODE
@@ -55,24 +60,23 @@ def get_data_quality_for_column_numeric(
     """
     result: dict[str, int | float | bool] = {}
     col = df[column_name]
+
+    # Check if all nulls
+    if col.is_null().all():
+        result["outlier_count"] = 0
+        result["outlier_rate"] = 0.0
+        result["has_low_variation"] = True
+        return result
+
     try:
-        null_count: int
         mean: float
         std: float
         if column_info is not None:
-            null_count = column_info.missing_count or col.null_count()
             mean = column_info.mean or float(col.mean())
             std = column_info.std or float(col.std())
         else:
-            null_count = col.null_count()
             mean = float(col.mean())
             std = float(col.std())
-
-        if null_count >= len(df):
-            result["outlier_count"] = 0
-            result["outlier_rate"] = 0.0
-            result["has_low_variation"] = True
-            return result
 
         z_scores = df.select(
             ((pl.col(column_name) - mean) / std).abs().alias("z_score")
@@ -115,10 +119,12 @@ def get_data_quality_for_column_categorical(
         else:
             value_counts = df.select(
                 pl.col(column_name).value_counts(sort=True, name="counts")
-            )
+            ).unnest(column_name)
             top_count = value_counts.select(pl.col("counts").max()).item()
         if top_count is not None:
-            has_low_variation = (top_count / df.height) > 0.95
+            has_low_variation = (top_count / df.height) > min(
+                1 - LOW_VARIATION_THRESHOLD, 1
+            )
             result["has_low_variation"] = has_low_variation
         result["outlier_count"] = 0
         result["outlier_rate"] = 0.0
@@ -148,14 +154,31 @@ def get_data_quality_for_column_temporal(
     """
     result: dict[str, int | float | bool] = {}
     try:
+        time_series: pl.Series = df[column_name]
+        time_series_float = (
+            time_series.cast(pl.Int128)
+            if time_series.dtype == pl.Date
+            else time_series.dt.timestamp("ms")
+        )
         # For temporal data, detect outliers using the IQR method
-        q1 = df.select(pl.col(column_name).quantile(0.25)).item()
-        q3 = df.select(pl.col(column_name).quantile(0.75)).item()
-        iqr = q3 - q1
-        lower_bound = q1 - 1.5 * iqr
-        upper_bound = q3 + 1.5 * iqr
+        q1: float = time_series_float.quantile(0.25)
+        q3: float = time_series_float.quantile(0.75)
+        iqr: float = q3 - q1
+        lower_bound: float = floor(q1 - 1.5 * iqr)
+        upper_bound: float = ceil(q3 + 1.5 * iqr)
+        lower_bound_dt = (
+            pl.from_epoch([int(lower_bound)], time_unit="d")[0]
+            if time_series.dtype == pl.Date
+            else pl.from_epoch([int(lower_bound)], time_unit="ms")[0]
+        )
+        upper_bound_dt = (
+            pl.from_epoch([int(upper_bound)], time_unit="d")[0]
+            if time_series.dtype == pl.Date
+            else pl.from_epoch([int(upper_bound)], time_unit="ms")[0]
+        )
         outliers = df.filter(
-            (pl.col(column_name) < lower_bound) | (pl.col(column_name) > upper_bound)
+            (pl.col(column_name) < lower_bound_dt)
+            | (pl.col(column_name) > upper_bound_dt)
         )
         outlier_count = outliers.height
         result["outlier_count"] = outlier_count

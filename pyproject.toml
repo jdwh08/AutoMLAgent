@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "Agentic AutoML"
-version = "2025.0.1"
+name = "AutoMLAgent"
+version = "2025.0.0.1"
 description = "Prototype for Agentic AutoML"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,15 +20,18 @@ dependencies = [
     "mlflow>=2.21.2",
     "openai>=1.70.0",
 ]
-license = "AGPLv3"
+license = { "text" = "AGPL-3.0" }
 license-files = ["LICEN[CS]E*"]
 keywords = ["AutoML", "Machine Learning", "Agents", "AI Agents"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
-  "Intended Audience :: Researchers",
-  "Topic :: AutoML :: AI Agents",
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Education",
+  "Intended Audience :: Developers",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
+  "License :: OSI Approved :: GNU Affero General Public License v3",
 ]
 
 [project.urls]
@@ -73,6 +76,7 @@ lint.ignore = [
     "TD003",  # Missing issue link on the line following this TODO  (no issue link system yet)
     "G004",   # Logging statement uses f-string
     "RET504", # Unnecessary assignment before return (good for debugging)
+    "PD901",  # Avoid using df for `pd.DataFrame`
 ]
 src = ["src"]
 

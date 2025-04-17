@@ -96,9 +96,6 @@ such as bias, adversarial datasets, data compliance, etc.
 
 ### License (and Additional Disclaimers)
 
-Prototype modular, agentic AutoML system for datasets.
-Copyright (C) 2025  Jonathan Wang <jdwh08@gmail.com>
-
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, version 3 of the
