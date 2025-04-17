@@ -1,0 +1,126 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "Agentic AutoML"
+version = "2025.0.1"
+description = "Prototype for Agentic AutoML"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    {name = "Jonathan Wang", email = "jdwh08@gmail.com"}
+]
+dependencies = [
+    "python-dotenv>=1.1.0",
+    "scikit-learn>=1.6.1",
+    "polars>=1.26.0",
+    "pydantic-ai-slim[openai]>=0.0.49",
+    "opentelemetry-sdk>=1.31.1",
+    "mlflow>=2.21.2",
+    "openai>=1.70.0",
+]
+license = "AGPLv3"
+license-files = ["LICEN[CS]E*"]
+keywords = ["AutoML", "Machine Learning", "Agents", "AI Agents"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Researchers",
+  "Topic :: AutoML :: AI Agents",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+]
+
+[project.urls]
+Repository = "https://github.com/jdwh08/Agentic-AutoML.git"
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.14.0",  # TODO: learn this better
+    "pyright>=1.1.350",
+    "ruff>=0.1.6",
+    "black>=24.10.0",
+    # VERTEX TESTING FOR DEV? Until we get a non-potato.
+    "vertexai>=1.71.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/AutoMLAgent"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"  # Python 3.11
+lint.select = ["ALL"]  # ALL DA RULES!
+lint.ignore = [
+    "COM",    # flake8-commas
+    "D100",   # Missing docstring in public module
+    "D101",   # Missing docstring in public class
+    "D102",   # Missing docstring in public method
+    "D103",   # Missing docstring in public function
+    "D104",   # Missing docstring in public package
+    "D213",   # Multi-line docstring closing quotes should be on a separate line
+    # "D406",   # Section name should end with a newline
+    # "D407",   # Missing dashed underline after section
+    # "FBT",    # flake8-boolean-trap
+    # "G004",   # Logging statement uses f-string
+    # "PTH123", # open() should be replaced by Path.open()
+    "TD003",  # Missing issue link on the line following this TODO  (no issue link system yet)
+    "G004",   # Logging statement uses f-string
+    "RET504", # Unnecessary assignment before return (good for debugging)
+]
+src = ["src"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]  # Use of Assert Detected (fine for tests)
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.pyright]
+include = ["src"]
+exclude = ["**/node_modules", "**/__pycache__"]
+strict = ["src/AutoMLAgent"]
+typeCheckingMode = "strict"
+useLibraryCodeForTypes = true
+reportMissingTypeStubs = "warning"
+reportUnknownMemberType = "warning"
+reportUnknownParameterType = "warning"
+reportUnknownVariableType = "warning"
+reportUnknownArgumentType = "warning"
+reportPrivateUsage = "warning"
+reportUntypedFunctionDecorator = "warning"
+
+[tool.mypy]
+plugins = [
+    "pydantic.mypy"
+]
+
+follow_imports = "silent"
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_generics = true
+check_untyped_defs = true
+no_implicit_reexport = true
+disallow_untyped_defs = true  # strict mypy
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+warn_untyped_fields = true
+
+[tool.pytest.ini_options]
+addopts = "-ra -q --cov=src --cov-report=term-missing"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
