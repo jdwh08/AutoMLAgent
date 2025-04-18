@@ -19,19 +19,19 @@ import mlflow
 import polars as pl
 
 ### OWN MODULES
-from AutoMLAgent.dataclass.column_info import ColumnInfo
-from AutoMLAgent.dataclass.column_type import ColumnType
-from AutoMLAgent.dataclass.df_info import DataFrameInfo
-from AutoMLAgent.eda.column.column_quality import get_data_quality_for_column
-from AutoMLAgent.eda.column.column_stats import (
+from automlagent.dataclass.column_info import ColumnInfo
+from automlagent.dataclass.column_type import ColumnType
+from automlagent.dataclass.df_info import DataFrameInfo
+from automlagent.eda.column.column_quality import get_data_quality_for_column
+from automlagent.eda.column.column_stats import (
     get_category_levels_for_column,
     get_histogram_bins_for_column,
     get_numerical_stats_for_column,
     get_temporal_stats_for_column,
 )
-from AutoMLAgent.eda.column.column_types import get_type_for_column
-from AutoMLAgent.eda.column.column_utils import MAX_CATEGORIES_FOR_LEVEL
-from AutoMLAgent.logger.mlflow_logger import logger
+from automlagent.eda.column.column_types import get_type_for_column
+from automlagent.eda.column.column_utils import MAX_CATEGORIES_FOR_LEVEL
+from automlagent.logger.mlflow_logger import logger
 
 #####################################################
 ### SETTINGS

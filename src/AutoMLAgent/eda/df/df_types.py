@@ -1,6 +1,6 @@
 #####################################################
 # AutoMLAgent [EDA COLUMN TYPE]
-# ####################################################
+#####################################################
 # Jonathan Wang
 
 # ABOUT:
@@ -17,9 +17,10 @@
 import mlflow
 import polars as pl
 
-from AutoMLAgent.dataclass.column_info import ColumnInfo
-from AutoMLAgent.dataclass.df_info import DataFrameInfo
-from AutoMLAgent.eda.column.column_types import get_type_for_column
+### OWN MODULES
+from automlagent.dataclass.column_info import ColumnInfo
+from automlagent.dataclass.df_info import DataFrameInfo
+from automlagent.eda.column.column_types import get_type_for_column
 
 
 #####################################################

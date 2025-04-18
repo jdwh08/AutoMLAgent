@@ -17,34 +17,64 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from math import ceil, floor
+from typing import TYPE_CHECKING, TypeAlias
 
 import mlflow
 import polars as pl
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 ### OWN MODULES
-from AutoMLAgent.dataclass.column_info import ColumnInfo
-from AutoMLAgent.dataclass.column_type import ColumnType
-from AutoMLAgent.eda.column.column_types import get_type_for_column
-from AutoMLAgent.logger.mlflow_logger import logger
+from automlagent.dataclass.column_info import ColumnInfo
+from automlagent.dataclass.column_type import ColumnType
+from automlagent.logger.mlflow_logger import logger
 
 #####################################################
 ### SETTINGS
-LOW_VARIATION_THRESHOLD = 0.05  # x% not majority class
+LOW_VARIATION_THRESHOLD = 0.05  # x% not majority class to be low variation
+
+ColumnDataQualityMetrics: TypeAlias = dict[str, int | float | bool]
+
 
 #####################################################
 ### CODE
+def column_data_quality_missing_check(
+    df: pl.DataFrame,
+    column_name: str,
+) -> ColumnDataQualityMetrics:
+    """Analyze data quality for a column with missing values.
+
+    Args:
+        df: The input dataframe
+        column_name: Name of the column to analyze
+
+    Returns:
+        ColumnDataQualityMetrics: dict with data quality metrics
+
+    """
+    if column_name not in df.columns:
+        msg = f"Column '{column_name}' not found in DataFrame."
+        raise KeyError(msg)
+
+    # Check if all nulls
+    result: ColumnDataQualityMetrics = {}
+    if df[column_name].is_null().all():
+        result["outlier_count"] = 0
+        result["outlier_rate"] = 0.0
+        result["has_low_variation"] = True
+    return result
 
 
-@mlflow.trace(name="get_data_quality_for_column_numeric", span_type="func")
-def get_data_quality_for_column_numeric(
+@mlflow.trace(name="column_data_quality_numeric", span_type="func")
+def column_data_quality_numeric(
     df: pl.DataFrame,
     column_name: str,
     column_info: ColumnInfo | None = None,
     outlier_zscore_threshold: float = 3.0,
     low_variance_threshold: float = 0.01,
-) -> dict[str, int | float | bool]:
+) -> ColumnDataQualityMetrics:
     """Analyze data quality for a numeric column (INTEGER, FLOAT).
 
     Args:
@@ -55,28 +85,44 @@ def get_data_quality_for_column_numeric(
         low_variance_threshold: Variance threshold for low variation
 
     Returns:
-        dict with data quality metrics
+        ColumnDataQualityMetrics: dict with data quality metrics
 
     """
-    result: dict[str, int | float | bool] = {}
-    col = df[column_name]
-
-    # Check if all nulls
-    if col.is_null().all():
-        result["outlier_count"] = 0
-        result["outlier_rate"] = 0.0
-        result["has_low_variation"] = True
+    result: ColumnDataQualityMetrics = column_data_quality_missing_check(
+        df, column_name
+    )
+    if result != {}:
         return result
 
-    try:
-        mean: float
-        std: float
+    def _get_mean_and_std(
+        col: pl.Series, column_info: ColumnInfo | None = None
+    ) -> tuple[float, float]:
         if column_info is not None:
-            mean = column_info.mean or float(col.mean())
-            std = column_info.std or float(col.std())
+            raw_mean = column_info.mean if column_info.mean is not None else col.mean()
+            raw_std = column_info.std if column_info.std is not None else col.std()
         else:
-            mean = float(col.mean())
-            std = float(col.std())
+            raw_mean = col.mean()
+            raw_std = col.std()
+
+        if raw_mean is None or raw_std is None:
+            msg = "Mean or standard deviation is None; cannot compute z-scores."
+            raise ValueError(msg)
+
+        try:
+            mean = float(raw_mean)
+            std = float(raw_std)
+        except (TypeError, ValueError) as e:
+            msg = (
+                "Mean or std is not convertible to float: "
+                f"mean={raw_mean!s}, std={raw_std!s}"
+            )
+            raise ValueError(msg) from e
+
+        return mean, std
+
+    try:
+        col = df[column_name]
+        mean, std = _get_mean_and_std(col, column_info)
 
         z_scores = df.select(
             ((pl.col(column_name) - mean) / std).abs().alias("z_score")
@@ -93,12 +139,12 @@ def get_data_quality_for_column_numeric(
     return result
 
 
-@mlflow.trace(name="get_data_quality_for_column_categorical", span_type="func")
-def get_data_quality_for_column_categorical(
+@mlflow.trace(name="column_data_quality_categorical", span_type="func")
+def column_data_quality_categorical_handler(
     df: pl.DataFrame,
     column_name: str,
     column_info: ColumnInfo | None = None,
-) -> dict[str, int | float | bool]:
+) -> ColumnDataQualityMetrics:
     """Analyze data quality for a categorical column (CATEGORICAL, TEXT).
 
     Args:
@@ -107,10 +153,15 @@ def get_data_quality_for_column_categorical(
         column_info: Optional ColumnInfo object
 
     Returns:
-        dict with data quality metrics
+        ColumnDataQualityMetrics: dict with data quality metrics
 
     """
-    result: dict[str, int | float | bool] = {}
+    result: ColumnDataQualityMetrics = column_data_quality_missing_check(
+        df, column_name
+    )
+    if result != {}:
+        return result
+
     try:
         top_count = None
         if column_info is not None and getattr(column_info, "category_counts", None):
@@ -135,12 +186,12 @@ def get_data_quality_for_column_categorical(
     return result
 
 
-@mlflow.trace(name="get_data_quality_for_column_temporal", span_type="func")
-def get_data_quality_for_column_temporal(
+@mlflow.trace(name="column_data_quality_temporal", span_type="func")
+def column_data_quality_temporal_handler(
     df: pl.DataFrame,
     column_name: str,
-    column_info: ColumnInfo | None = None,
-) -> dict[str, int | float | bool]:
+    column_info: ColumnInfo | None = None,  # noqa: ARG001
+) -> ColumnDataQualityMetrics:
     """Analyze data quality for a temporal column (DATETIME, DATE, TIME).
 
     Args:
@@ -149,10 +200,19 @@ def get_data_quality_for_column_temporal(
         column_info: Optional ColumnInfo object
 
     Returns:
-        dict with data quality metrics
+        ColumnDataQualityMetrics: dict with data quality metrics
 
     """
-    result: dict[str, int | float | bool] = {}
+    result: ColumnDataQualityMetrics = column_data_quality_missing_check(
+        df, column_name
+    )
+    if result != {}:
+        return result
+
+    # NOTE(jdwh08): A response to TRY301 -- feels silly?
+    def _raise_conversion_error(msg: str) -> None:
+        raise ValueError(msg)
+
     try:
         time_series: pl.Series = df[column_name]
         time_series_float = (
@@ -160,12 +220,18 @@ def get_data_quality_for_column_temporal(
             if time_series.dtype == pl.Date
             else time_series.dt.timestamp("ms")
         )
+        if time_series_float is None:
+            _raise_conversion_error("Failed to convert time series to float.")
+
         # For temporal data, detect outliers using the IQR method
-        q1: float = time_series_float.quantile(0.25)
-        q3: float = time_series_float.quantile(0.75)
-        iqr: float = q3 - q1
-        lower_bound: float = floor(q1 - 1.5 * iqr)
-        upper_bound: float = ceil(q3 + 1.5 * iqr)
+        q1 = time_series_float.quantile(0.25)
+        q3 = time_series_float.quantile(0.75)
+        if q1 is None or q3 is None:
+            _raise_conversion_error("Failed to calculate quantiles for temporal data.")
+
+        iqr: float = q3 - q1  # type: ignore[operator] <handled w/ raise error>
+        lower_bound: float = floor(q1 - 1.5 * iqr)  # type: ignore[operator]
+        upper_bound: float = ceil(q3 + 1.5 * iqr)  # type: ignore[operator]
         lower_bound_dt = (
             pl.from_epoch([int(lower_bound)], time_unit="d")[0]
             if time_series.dtype == pl.Date
@@ -198,7 +264,7 @@ def get_data_quality_for_column(
     column_info: ColumnInfo | None = None,
     outlier_zscore_threshold: float = 3.0,
     low_variance_threshold: float = 0.01,
-) -> dict[str, int | float | bool]:
+) -> ColumnDataQualityMetrics:
     """Analyze data quality for a single column.
 
     Args:
@@ -216,19 +282,16 @@ def get_data_quality_for_column(
     if column_info and column_info.type:
         col_type: ColumnType = column_info.type
     else:
-        # Crappy fallback (doesn't set the column info...)
-        col_type_info = get_type_for_column(df, column_name).get("type")
-        if not isinstance(col_type_info, ColumnType):
-            msg = f"Invalid column type: {col_type_info}"
-            raise ValueError(msg)
-        col_type = col_type_info
+        msg = f"Column type not in ColumnInfo {column_name}"
+        raise ValueError(msg)
 
-    def numeric_handler(
+    def column_data_quality_numeric_handler(
         df: pl.DataFrame,
         column_name: str,
         column_info: ColumnInfo | None = None,
-    ) -> dict[str, int | float | bool]:
-        return get_data_quality_for_column_numeric(
+    ) -> ColumnDataQualityMetrics:
+        """Handle numeric with outlier and variance args."""
+        return column_data_quality_numeric(
             df,
             column_name,
             column_info=column_info,
@@ -239,15 +302,15 @@ def get_data_quality_for_column(
     # Strategy dispatcher
     strategy_map: dict[
         ColumnType,
-        Callable[[pl.DataFrame, str, ColumnInfo | None], dict[str, int | float | bool]],
+        Callable[[pl.DataFrame, str, ColumnInfo | None], ColumnDataQualityMetrics],
     ] = {
-        ColumnType.INTEGER: numeric_handler,
-        ColumnType.FLOAT: numeric_handler,
-        ColumnType.CATEGORICAL: get_data_quality_for_column_categorical,
-        ColumnType.TEXT: get_data_quality_for_column_categorical,
-        ColumnType.DATETIME: get_data_quality_for_column_temporal,
-        ColumnType.DATE: get_data_quality_for_column_temporal,
-        ColumnType.TIME: get_data_quality_for_column_temporal,
+        ColumnType.INTEGER: column_data_quality_numeric_handler,
+        ColumnType.FLOAT: column_data_quality_numeric_handler,
+        ColumnType.CATEGORICAL: column_data_quality_categorical_handler,
+        ColumnType.TEXT: column_data_quality_categorical_handler,
+        ColumnType.DATETIME: column_data_quality_temporal_handler,
+        ColumnType.DATE: column_data_quality_temporal_handler,
+        ColumnType.TIME: column_data_quality_temporal_handler,
     }
 
     handler = strategy_map.get(col_type)

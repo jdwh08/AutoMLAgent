@@ -24,14 +24,14 @@ license = "GPL-3.0-or-later"
 license-files = ["LICEN[CS]E*"]
 keywords = ["AutoML", "Machine Learning", "Agents", "AI Agents"]
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
-  "Intended Audience :: Science/Research",
-  "Intended Audience :: Education",
-  "Intended Audience :: Developers",
-  "Topic :: Scientific/Engineering :: Artificial Intelligence",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.11",
-  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
 ]
 
 [project.urls]
@@ -67,6 +67,7 @@ lint.ignore = [
     "D102",   # Missing docstring in public method
     "D103",   # Missing docstring in public function
     "D104",   # Missing docstring in public package
+    "D203",   # Incorrect blank line before class
     "D213",   # Multi-line docstring closing quotes should be on a separate line
     # "D406",   # Section name should end with a newline
     # "D407",   # Missing dashed underline after section
@@ -77,6 +78,8 @@ lint.ignore = [
     "G004",   # Logging statement uses f-string
     "RET504", # Unnecessary assignment before return (good for debugging)
     "PD901",  # Avoid using df for `pd.DataFrame`
+    "TC001",  # Typing Only First Party Import (needed for pydantic basemodel compile)
+    "BLE001", # Blind Except (not detecting error logging) 
 ]
 src = ["src"]
 

@@ -1,6 +1,6 @@
 #####################################################
 # AutoMLAgent [EDA COLUMN QUALITY]
-# ####################################################
+#####################################################
 # Jonathan Wang
 
 # ABOUT:
@@ -18,9 +18,10 @@
 import mlflow
 import polars as pl
 
-from AutoMLAgent.dataclass.column_info import ColumnInfo
-from AutoMLAgent.dataclass.df_info import DataFrameInfo
-from AutoMLAgent.eda.column.column_quality import get_data_quality_for_column
+### OWN MODULES
+from automlagent.dataclass.column_info import ColumnInfo
+from automlagent.dataclass.df_info import DataFrameInfo
+from automlagent.eda.column.column_quality import get_data_quality_for_column
 
 
 #####################################################
@@ -42,7 +43,8 @@ def get_data_quality(
         df: The input dataframe
         df_info: DataFrameInfo containing column information
         outlier_zscore_threshold: Z-score threshold for outlier detection
-        low_variance_threshold: Variance threshold below which a column is considered to have low variation
+        low_variance_threshold: Variance threshold below which a column
+            is considered to have low variation
 
     Returns:
         Updated DataFrameInfo with data quality metrics

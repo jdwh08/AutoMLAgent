@@ -15,7 +15,6 @@
 #####################################################
 ### IMPORTS
 
-import polars as pl
 
 #####################################################
 ### SETTINGS
@@ -27,11 +26,3 @@ MAX_CATEGORIES_FOR_LEVEL = (
     20  # Max number of categories to show for categorical columns
 )
 LONG_TEXT_THRESHOLD = 1024  # Number of characters to be considered long text
-
-# Polars temporal types
-polars_temporal = (
-    pl.datatypes.Datetime
-    | pl.datatypes.Date
-    | pl.datatypes.Duration
-    | pl.datatypes.Time
-)

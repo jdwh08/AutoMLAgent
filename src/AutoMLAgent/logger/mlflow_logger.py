@@ -22,6 +22,9 @@ from typing import Any, ClassVar
 
 import mlflow
 
+### OWN MODULES
+from automlagent.utils.typing_utils import check_kwargs
+
 
 #####################################################
 ### CODE
@@ -36,8 +39,6 @@ class MLFlowLogger(logging.Logger):
         name: str = "mlflow",
         run_id: str | None = None,
         level: int = logging.DEBUG,
-        *args: Any,
-        **kwargs: Any,
     ) -> None:
         """Initialize the logger."""
         # Initialize the parent Logger first with only parameters it accepts
@@ -61,16 +62,17 @@ class MLFlowLogger(logging.Logger):
     def _log_mlflow(self, message: str) -> None:
         """Log messages at the MLflow level."""
         if self.isEnabledFor(logging.INFO + 5):
-            self._log(logging.INFO + 5, message, (), {"stacklevel": 2})
+            self._log(level=logging.INFO + 5, msg=message, args=(), stacklevel=2)
 
-    def log_param(self, param: str, value: Any, **kwargs: Any) -> None:
+    def log_param(self, param: str, value: object) -> None:
         """Log a parameter to MLflow and to the logger."""
         mlflow.log_param(param, value)
         self._log_mlflow(f"PARAM - {param}: {value!s}")
 
-    def log_metric(self, metric: str, value: Any, **kwargs: Any) -> None:
+    def log_metric(self, metric: str, value: float, **kwargs: object) -> None:
         """Log a metric to MLflow and to the logger."""
-        mlflow.log_metric(metric, value)
+        filtered_kwargs = check_kwargs(kwargs, mlflow.log_metric)
+        mlflow.log_metric(metric, value, **filtered_kwargs)  # type: ignore[arg-type, unused-ignore, reportArgumentType]
         self._log_mlflow(f"METRIC - {metric}: {value!s}")
 
 

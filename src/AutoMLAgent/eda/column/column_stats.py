@@ -21,8 +21,11 @@ import mlflow
 import polars as pl
 
 ### OWN MODULES
-from AutoMLAgent.eda.column.column_utils import MAX_CATEGORIES_FOR_LEVEL
-from AutoMLAgent.logger.mlflow_logger import logger
+from automlagent.eda.column.column_utils import MAX_CATEGORIES_FOR_LEVEL
+from automlagent.logger.mlflow_logger import logger
+
+#####################################################
+### SETTINGS
 
 
 #####################################################
@@ -38,63 +41,78 @@ def get_histogram_bins_for_column(
         column_name (str): The column to analyze.
 
     Returns:
-        dict[str, list[float] | list[int]]: The bin edges and the count of rows in each bin.
+        dict[str, list[float] | list[int]]: The bin edges
+            and the count of rows in each bin.
             If failed to create, dictionary is empty.
 
     """
     output: dict[str, list[float] | list[int]] = {}
     histogram_bins: list[float] = []
     histogram_counts: list[int] = []
+
+    if column_name not in df.columns:
+        msg = f"Column '{column_name}' not found in DataFrame."
+        raise KeyError(msg)
+    if not df[column_name].dtype.is_numeric():
+        msg = f"Column '{column_name}' must be numeric."
+        raise TypeError(msg)
+
     try:
         histogram = (
             df.select(pl.col(column_name).hist(include_category=True))
             .unnest(column_name)
             .sort("category")
         )
-        if histogram is not None and len(histogram) > 0:
-            # Convert interval strings to numeric bin edges
+        if histogram is None or len(histogram) <= 0:
+            msg = f"Failed to create histogram for {column_name}."
+            logger.warning(msg, stacklevel=2)
+            return None
 
-            # Sort to ensure we process bins in order
-            for row in histogram.rows():
-                category, count = row
+        # Convert interval strings to numeric bin edges
+        # Sort to ensure we process bins in order
+        for row in histogram.rows():
+            category, count = row
 
-                # Extract numeric values from interval notation
-                # Format is typically "(lower, upper]" or "[lower, upper]"
-                if not category or not isinstance(category, str):
-                    continue
+            # Extract numeric values from interval notation
+            # Format is typically "(lower, upper]" or "[lower, upper]"
+            if not category or not isinstance(category, str):
+                msg = f"Failed to parse bin for {column_name}: {category}"
+                logger.warning(msg, stacklevel=2)
+                continue
 
-                # Strip brackets and split by comma
-                values = category.strip("()[]").split(",")
-                if len(values) != 2:
-                    continue
+            # Strip brackets and split by comma
+            expected_num_bounds = 2
+            bounds = category.strip("()[]").split(",")
+            if len(bounds) != expected_num_bounds:
+                msg = f"Failed to parse bin for {column_name}: {category}"
+                logger.warning(msg, stacklevel=2)
+                continue
 
-                try:
-                    lower = float(values[0].strip())
-                    upper = float(values[1].strip())
+            try:
+                lower = float(bounds[0].strip())
+                upper = float(bounds[1].strip())
+                # For first bin, add the lower edge
+                if not histogram_bins:
+                    histogram_bins.append(lower)
 
-                    # For first bin, add the lower edge
-                    if not histogram_bins:
-                        histogram_bins.append(lower)
+                # Always add the upper edge
+                histogram_bins.append(upper)
+                histogram_counts.append(count)
+            except ValueError:
+                logger.exception(f"Failed to parse bin for {column_name}")
+                continue
 
-                    # Always add the upper edge
-                    histogram_bins.append(upper)
-                    histogram_counts.append(count)
-                except ValueError:
-                    logger.exception(f"Failed to parse bin for {column_name}")
-                    continue
-
-            # Only store if we successfully parsed bins
-            if (
-                histogram_bins
-                and histogram_counts
-                and len(histogram_bins) == len(histogram_counts) + 1
-            ):
-                output["histogram_bins"] = histogram_bins
-                output["histogram_counts"] = histogram_counts
-                return output
+        # Only store if we successfully parsed bins
+        if (
+            histogram_bins
+            and histogram_counts
+            and len(histogram_bins) == len(histogram_counts) + 1
+        ):
+            output = {"bin_edges": histogram_bins, "counts": histogram_counts}
+            return output
     except Exception:
         logger.exception(f"Failed to create histogram for {column_name}")
-    return output
+    return None
 
 
 @mlflow.trace(name="get_category_levels_for_column", span_type="func")
