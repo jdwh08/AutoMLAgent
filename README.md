@@ -63,8 +63,13 @@ For now, we focus only on non-competition tabular kaggle datasets which I rememb
 ## Papers and References to Consider
 
 - AutoML <https://www.automl.org/wp-content/uploads/2019/05/AutoML_Book.pdf>
+- NNI <https://github.com/microsoft/nni>
 - Auto sklearn <https://github.com/automl/auto-sklearn/tree/development>
 - Feature Engine <https://feature-engine.trainindata.com/en/latest/index.html>
+- Feature Tools <https://github.com/alteryx/featuretools>
+- TPOT <https://github.com/EpistasisLab/tpot>
+- AILink <https://github.com/alibaba/Alink>
+- MLJar <https://github.com/mljar/mljar-supervised>
 
 ## Disclaimers and License
 
