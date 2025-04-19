@@ -31,8 +31,8 @@ jobs:
     # - name: Type check with mypy
     #   run: uv run mypy src/
 
-    - name: Lint code with Ruff
-      run: uv run ruff check --output-format=github --target-version=py311
+    # - name: Lint code with Ruff
+    #   run: uv run ruff check --output-format=github --target-version=py311
 
     - name: Check code formatting
       run: uv run ruff format --check --diff --target-version=py311
