@@ -96,7 +96,7 @@ line-ending = "auto"
 [tool.pyright]
 include = ["src"]
 exclude = ["**/node_modules", "**/__pycache__"]
-strict = ["src/AutoMLAgent"]
+strict = ["src/automlagent"]
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
 reportMissingTypeStubs = "warning"

@@ -28,6 +28,13 @@ jobs:
         uv venv
         uv pip install -e ".[dev]"
 
+    - name: Debug: List installed packages
+      run: uv pip list
+
+    - name: Debug: Show .pth files and content
+      run: |
+        find .venv -name "*.pth" -exec echo {} \; -exec cat {} \;
+
     # - name: Type check with mypy
     #   run: uv run mypy src/
 
