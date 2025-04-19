@@ -30,7 +30,7 @@ from pydantic_ai import Agent, RunContext
 ### OWN MODULES
 from automlagent.dataclass.column_info import create_column_info
 from automlagent.eda.eda_column_tools import analyze_column
-from automlagent.logger.mlflow_logger import logger
+from automlagent.logger.mlflow_logger import get_mlflow_logger
 
 #####################################################
 ### SETTINGS
@@ -43,7 +43,7 @@ load_dotenv()
 # mlflow.openai.autolog()  # noqa: ERA001
 mlflow.gemini.autolog()  # NOTE(jdwh08): doesn't really work
 mlflow.autolog()  # for modelling tasks
-mlflow.set_experiment("PYDANTIC AGENTS TEST v0")
+mlflow.set_experiment("PYDANTIC AGENTS TEST v1 EDA")
 mlflow.config.enable_async_logging()  # type: ignore[syntax, reportPrivateImportUsage] <mlflow docs recommends this>
 
 # TODO(jdwh08): update model to more local / open
@@ -120,6 +120,7 @@ async def eda_column_tool(ctx: RunContext[DfEdaDependencies], column_name: str) 
             df=df, column_name=column_name, column_info=column_info
         )
     except Exception as e:
+        logger = get_mlflow_logger()
         logger.exception(f"Failed to analyze column {column_name}")
         return f"Error analyzing column '{column_name}': {e!s}"
     else:
@@ -134,31 +135,34 @@ async def main(
     feature_vars: list[str] | None = None,
 ) -> None:
     """Run EDA on a dataset."""
-    with mlflow.start_span(name="data_loading", span_type="data") as span:
-        span.set_inputs({"file_path": str(file_path)})
-        credit_df = pl.read_csv(file_path)
-        if feature_vars is None:
-            feature_vars = [col for col in credit_df.columns if col != target_var]
-        deps = DfEdaDependencies(
-            file_path=file_path,
-            df=credit_df,
-            target_var=target_var,
-            feature_vars=feature_vars,
+    with mlflow.start_run():
+        logger = get_mlflow_logger()
+
+        with mlflow.start_span(name="data_loading", span_type="data") as span:
+            span.set_inputs({"file_path": str(file_path)})
+            credit_df = pl.read_csv(file_path)
+            if feature_vars is None:
+                feature_vars = [col for col in credit_df.columns if col != target_var]
+            deps = DfEdaDependencies(
+                file_path=file_path,
+                df=credit_df,
+                target_var=target_var,
+                feature_vars=feature_vars,
+            )
+            span.set_outputs(deps)
+
+        # TODO(jdwh08): update kickoff prompt for full df
+        kickoff_prompt: str = (
+            "Help me conduct extensive exploratory data analysis for the target variable "
+            f"of the dataset, called {target_var}."
         )
-        span.set_outputs(deps)
 
-    # TODO(jdwh08): update kickoff prompt for full df
-    kickoff_prompt: str = (
-        "Help me conduct extensive exploratory data analysis for the target variable "
-        f"of the dataset, called {target_var}."
-    )
-
-    result = await eda_agent.run(
-        kickoff_prompt,
-        deps=deps,
-    )
-    output = f"Response: {result.data}"
-    logger.info(output)
+        result = await eda_agent.run(
+            kickoff_prompt,
+            deps=deps,
+        )
+        output = f"Response: {result.data}"
+        logger.info(output)
 
 
 if __name__ == "__main__":

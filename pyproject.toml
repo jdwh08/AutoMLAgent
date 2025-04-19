@@ -61,6 +61,7 @@ line-length = 88
 target-version = "py311"  # Python 3.11
 lint.select = ["ALL"]  # ALL DA RULES!
 lint.ignore = [
+    "BLE001", # Blind Except (not detecting error logging)
     "COM",    # flake8-commas
     "D100",   # Missing docstring in public module
     "D101",   # Missing docstring in public class
@@ -72,19 +73,19 @@ lint.ignore = [
     # "D406",   # Section name should end with a newline
     # "D407",   # Missing dashed underline after section
     # "FBT",    # flake8-boolean-trap
-    # "G004",   # Logging statement uses f-string
-    # "PTH123", # open() should be replaced by Path.open()
-    "TD003",  # Missing issue link on the line following this TODO  (no issue link system yet)
+    "FIX002", # Code contains TODO (using for longer term planning)
     "G004",   # Logging statement uses f-string
     "RET504", # Unnecessary assignment before return (good for debugging)
-    "PD901",  # Avoid using df for `pd.DataFrame`
     "TC001",  # Typing Only First Party Import (needed for pydantic basemodel compile)
-    "BLE001", # Blind Except (not detecting error logging) 
+    "TD003",  # Missing issue link on the line following this TODO  (no issue link system yet)
 ]
 src = ["src"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101"]  # Use of Assert Detected (fine for tests)
+"tests/**/*.py" = [
+    "S101",  # Use of Assert Detected (fine for tests)
+    "PD901"  # Avoid using df for `pd.DataFrame`
+]
 
 [tool.ruff.format]
 quote-style = "double"

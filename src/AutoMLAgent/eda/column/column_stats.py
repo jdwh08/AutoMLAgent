@@ -22,7 +22,7 @@ import polars as pl
 
 ### OWN MODULES
 from automlagent.eda.column.column_utils import MAX_CATEGORIES_FOR_LEVEL
-from automlagent.logger.mlflow_logger import logger
+from automlagent.logger.mlflow_logger import get_mlflow_logger
 
 #####################################################
 ### SETTINGS
@@ -46,6 +46,8 @@ def get_histogram_bins_for_column(
             If failed to create, dictionary is empty.
 
     """
+    logger = get_mlflow_logger()
+
     output: dict[str, list[float] | list[int]] = {}
     histogram_bins: list[float] = []
     histogram_counts: list[int] = []
@@ -147,6 +149,7 @@ def get_category_levels_for_column(
                 count = row_dict.get("counts")
                 category_counts[str(value)] = count
     except Exception:
+        logger = get_mlflow_logger()
         logger.exception(f"Failed to create histogram for {column_name}")
     return category_counts
 

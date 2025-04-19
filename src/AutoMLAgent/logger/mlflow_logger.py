@@ -18,7 +18,7 @@
 ### IMPORTS
 
 import logging
-from typing import Any, ClassVar
+from typing import ClassVar
 
 import mlflow
 
@@ -26,13 +26,12 @@ import mlflow
 from automlagent.utils.typing_utils import check_kwargs
 
 
-#####################################################
-### CODE
+####################################################
+### CLASS
 class MLFlowLogger(logging.Logger):
     """Integrating MLflow into Python logging."""
 
-    run_id: str | None
-    run: Any
+    mlflow_log_level: ClassVar[int] = logging.INFO + 5
 
     def __init__(
         self,
@@ -44,25 +43,24 @@ class MLFlowLogger(logging.Logger):
         # Initialize the parent Logger first with only parameters it accepts
         super().__init__(name, level)
 
-        self.run_id = run_id
-
-        # Start an MLflow run if not provided
-        if not self.run_id:
-            self.run = mlflow.start_run()
-            self.run_id = self.run.info.run_id
-        else:
-            mlflow.start_run(run_id=self.run_id)
+        # Get MLFlow run
+        if run_id is None:
+            active_run = mlflow.active_run()
+            if active_run is None:
+                msg = "No active MLFlow run. Please start a run before logging."
+                raise RuntimeError(msg)
+            run_id = str(active_run.info.run_id)  # type: ignore[reportUnknownMemberType, unused-ignore]
 
         # Add custom logging level for MLflow
-        logging.addLevelName(logging.INFO + 5, "MLFLOW")
+        logging.addLevelName(self.mlflow_log_level, "MLFLOW")
 
         # Log the run ID using the custom level
-        self._log_mlflow(f"Run ID: {self.run_id}")
+        self._log_mlflow(f"Run ID: {run_id}")
 
     def _log_mlflow(self, message: str) -> None:
         """Log messages at the MLflow level."""
-        if self.isEnabledFor(logging.INFO + 5):
-            self._log(level=logging.INFO + 5, msg=message, args=(), stacklevel=2)
+        if self.isEnabledFor(self.mlflow_log_level):
+            self._log(level=self.mlflow_log_level, msg=message, args=(), stacklevel=2)
 
     def log_param(self, param: str, value: object) -> None:
         """Log a parameter to MLflow and to the logger."""
@@ -92,6 +90,13 @@ class RainbowFormatter(logging.Formatter):
         return f"{color}{record.levelname}\033[1;0m: {msg}"
 
 
+#####################################################
+### SETTINGS
+_logger_instance: MLFlowLogger | None = None
+
+
+#####################################################
+### CODE
 def get_mlflow_logger(
     name: str = "mlflow",
     run_id: str | None = None,
@@ -112,23 +117,27 @@ def get_mlflow_logger(
     Returns:
         Configured MLFlowLogger instance
 
+    Note:
+        Singleton global MLFlowLogger instance.
+        Should only create logger if doesn't exist yet.
+        Done this way so that we always have a MLflow run to log to.
+
     """
-    logger = MLFlowLogger(name=name, run_id=run_id, level=level)
+    # BUG(jdwh08): Singleton global logger, not sure about multi-threading/process!
+    global _logger_instance  # noqa: PLW0603
 
-    if add_console_handler:
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)
+    if _logger_instance is None:
+        _logger_instance = MLFlowLogger(name=name, run_id=run_id, level=level)
 
-        # Use RainbowFormatter by default
-        if formatter is None:
-            formatter = RainbowFormatter()
+        if add_console_handler:
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(level)
 
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
+            # Use RainbowFormatter by default
+            if formatter is None:
+                formatter = RainbowFormatter()
 
-    return logger
+            console_handler.setFormatter(formatter)
+            _logger_instance.addHandler(console_handler)
 
-
-#####################################################
-### GLOBAL LOGGER (one for now)
-logger = get_mlflow_logger()
+    return _logger_instance

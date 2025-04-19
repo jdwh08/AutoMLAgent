@@ -25,6 +25,7 @@ from automlagent.dataclass.column_info import ColumnInfo
 from automlagent.dataclass.column_type import ColumnType
 from automlagent.eda.column.column_quality import (
     column_data_quality_categorical_handler,
+    column_data_quality_missing_check,
     column_data_quality_numeric,
     column_data_quality_temporal_handler,
     get_data_quality_for_column,
@@ -37,6 +38,31 @@ class TestUnitColumnQuality:
     @pytest.fixture
     def basic_float_df(self) -> pl.DataFrame:
         return pl.DataFrame({"col": [1.0, 2.0, 3.0, 4.0, 5.0]})
+
+    def test_column_name_not_in_df(
+        self,
+        basic_float_df: pl.DataFrame,
+    ) -> None:
+        with pytest.raises(KeyError, match="Column 'col2' not found in DataFrame."):
+            column_data_quality_missing_check(basic_float_df, "col2")
+
+    def test_numeric_non_numeric_column(self) -> None:
+        """Covers fallback/exception path at end of column_data_quality_numeric."""
+        df = pl.DataFrame({"col": ["a", "b", "c"]})
+        res = column_data_quality_numeric(df, "col")
+        assert res == {}
+
+    def test_numeric_get_mean_and_std_none(self) -> None:
+        """Covers exception when mean or std is None in _get_mean_and_std."""
+        df = pl.DataFrame({"col": [None, None, None]})
+        # Patch ColumnInfo to have None mean/std
+        ci = ColumnInfo(name="col", mean=None, std=None)
+        res = column_data_quality_numeric(df, "col", column_info=ci)
+        assert res == {
+            "has_low_variation": True,
+            "outlier_count": 0,
+            "outlier_rate": 0.0,
+        }
 
     def test_numeric_no_outliers_no_low_variation(
         self, basic_float_df: pl.DataFrame
@@ -154,3 +180,45 @@ class TestUnitColumnQuality:
         df = pl.DataFrame({"x": [1, 2, 3]})
         ci = ColumnInfo(name="x", type=ColumnType.UNKNOWN)
         assert get_data_quality_for_column(df, "x", column_info=ci) == {}
+
+    def test_categorical_all_nulls(self) -> None:
+        """Covers categorical handler with all nulls."""
+        df = pl.DataFrame({"col": [None, None, None]})
+        res = column_data_quality_categorical_handler(df, "col")
+        assert res["has_low_variation"] is True
+        assert res["outlier_count"] == 0
+        assert res["outlier_rate"] == 0.0
+
+    def test_categorical_broken_column_info(self) -> None:
+        """Covers categorical handler with malformed ColumnInfo."""
+        ci = ColumnInfo(name="col")
+        ci.category_counts = None  # type: ignore[assignment]
+        df = pl.DataFrame({"col": ["a", "b", "c"]})
+        res = column_data_quality_categorical_handler(df, "col", column_info=ci)
+        assert isinstance(res, dict)
+
+    def test_temporal_non_convertible_column(self) -> None:
+        """Covers temporal handler conversion error."""
+        df = pl.DataFrame({"col": ["not_date", "also_not_a_date"]})
+        res = column_data_quality_temporal_handler(df, "col")
+        assert isinstance(res, dict)
+
+    def test_temporal_all_nulls(self) -> None:
+        """Covers temporal handler with all nulls."""
+        df = pl.DataFrame({"col": [None, None, None]})
+        res = column_data_quality_temporal_handler(df, "col")
+        assert isinstance(res, dict)
+
+    def test_temporal_one_unique(self) -> None:
+        """Covers temporal handler unique_count <= 1."""
+        df = pl.DataFrame({"col": ["2022-01-01"] * 5})
+        df = df.with_columns(pl.col("col").str.to_date().alias("col"))
+        res = column_data_quality_temporal_handler(df, "col")
+        assert res["has_low_variation"] is True
+
+    def test_numeric_handler_missing_column(self) -> None:
+        """Covers numeric handler edge case."""
+        ci = ColumnInfo(name="not_in_df", type=ColumnType.FLOAT)
+        df = pl.DataFrame({"col": [1.0, 2.0]})
+        with pytest.raises(KeyError):
+            get_data_quality_for_column(df, "not_in_df", column_info=ci)

@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 ### OWN MODULES
 from automlagent.dataclass.column_info import ColumnInfo
 from automlagent.dataclass.column_type import ColumnType
-from automlagent.logger.mlflow_logger import logger
+from automlagent.logger.mlflow_logger import get_mlflow_logger
 
 #####################################################
 ### SETTINGS
@@ -40,6 +40,9 @@ ColumnDataQualityMetrics: TypeAlias = dict[str, int | float | bool]
 
 #####################################################
 ### CODE
+
+
+@mlflow.trace(name="column_data_quality_missing_check", span_type="func")
 def column_data_quality_missing_check(
     df: pl.DataFrame,
     column_name: str,
@@ -51,7 +54,8 @@ def column_data_quality_missing_check(
         column_name: Name of the column to analyze
 
     Returns:
-        ColumnDataQualityMetrics: dict with data quality metrics
+        ColumnDataQualityMetrics: If all nulls, populate.
+        Empty dict otherwise.
 
     """
     if column_name not in df.columns:
@@ -105,7 +109,9 @@ def column_data_quality_numeric(
             raw_std = col.std()
 
         if raw_mean is None or raw_std is None:
-            msg = "Mean or standard deviation is None; cannot compute z-scores."
+            # NOTE(jdwh08): mean of not-computable column is none.
+            # NOTE(jdwh08): polars mean of column ignores missing (nanmean).
+            msg = "Column mean or standard deviation is None or not computable."
             raise ValueError(msg)
 
         try:
@@ -135,6 +141,7 @@ def column_data_quality_numeric(
         variance = std**2
         result["has_low_variation"] = variance < low_variance_threshold
     except Exception:
+        logger = get_mlflow_logger()
         logger.exception(f"Error analyzing quality for numeric column {column_name}")
     return result
 
@@ -180,6 +187,7 @@ def column_data_quality_categorical_handler(
         result["outlier_count"] = 0
         result["outlier_rate"] = 0.0
     except Exception:
+        logger = get_mlflow_logger()
         logger.exception(
             f"Error analyzing quality for categorical column {column_name}"
         )
@@ -229,7 +237,8 @@ def column_data_quality_temporal_handler(
         if q1 is None or q3 is None:
             _raise_conversion_error("Failed to calculate quantiles for temporal data.")
 
-        iqr: float = q3 - q1  # type: ignore[operator] <handled w/ raise error>
+        # NOTE(jdwh08): type ignore <handled w/ raise error>
+        iqr: float = q3 - q1  # type: ignore[operator]
         lower_bound: float = floor(q1 - 1.5 * iqr)  # type: ignore[operator]
         upper_bound: float = ceil(q3 + 1.5 * iqr)  # type: ignore[operator]
         lower_bound_dt = (
@@ -253,6 +262,7 @@ def column_data_quality_temporal_handler(
         unique_count = df[column_name].n_unique()
         result["has_low_variation"] = unique_count <= 1
     except Exception:
+        logger = get_mlflow_logger()
         logger.exception(f"Error analyzing quality for temporal column {column_name}")
     return result
 
@@ -315,6 +325,7 @@ def get_data_quality_for_column(
 
     handler = strategy_map.get(col_type)
     if handler is None:
+        logger = get_mlflow_logger()
         logger.warning(f"Unknown column type for {column_name}: {col_type}")
         return {}
     return handler(df, column_name, column_info)

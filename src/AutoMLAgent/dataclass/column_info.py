@@ -15,6 +15,8 @@
 #####################################################
 ### IMPORTS
 
+import datetime
+
 import mlflow
 from dotenv.main import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field
@@ -87,7 +89,7 @@ class ColumnInfo(BaseModel):
     # Temporal analysis fields
     temporal_min: PolarsTemporal | None = None
     temporal_max: PolarsTemporal | None = None
-    temporal_diff: PolarsTemporal | None = None
+    temporal_diff: datetime.timedelta | None = None
 
     # Flag to track if detailed analysis has been performed
     is_analyzed: bool = False

@@ -32,7 +32,7 @@ from automlagent.eda.column.column_utils import (
     DEFAULT_CATEGORICAL_THRESHOLD,
     MAX_CATEGORICAL_RATIO,
 )
-from automlagent.logger.mlflow_logger import logger
+from automlagent.logger.mlflow_logger import get_mlflow_logger
 
 #####################################################
 ### SETTINGS
@@ -55,6 +55,7 @@ def initialize_output_dict(
             cardinality = df[column_name].n_unique()
             output["cardinality"] = cardinality
         except Exception:
+            logger = get_mlflow_logger()
             logger.exception(f"Failed to calculate cardinality for {column_name}")
             cardinality = len(df)  # assume worse case
             output["cardinality"] = cardinality
@@ -82,7 +83,8 @@ def create_column_type_handlers(
             NOTE: yes we could caclulate it here, but I don't want duplicate logic
 
     Returns:
-        list[tuple[Callable[[], bool], Callable[[ColumnTypeDict], None]]]: A list of (predicate, handler) pairs.
+        list[tuple[Callable[[], bool], Callable[[ColumnTypeDict], None]]]:
+            A list of (predicate, handler) pairs.
 
     """
     # Calculate cardinality threshold based on dataset size
@@ -172,9 +174,11 @@ def get_type_for_column(
         column_info: The column info for the column, if known.
 
     Returns:
-        dict[str, ColumnType | bool | int]: A dictionary containing the attributes for column type.
+        dict[str, ColumnType | bool | int]: A dictionary containing
+            the attributes for column type.
 
     """
+    logger = get_mlflow_logger()
     output: dict[str, ColumnType | bool | int] = {}
 
     # Calculate cardinality if not already known
