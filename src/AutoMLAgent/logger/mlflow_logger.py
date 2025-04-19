@@ -18,6 +18,7 @@
 ### IMPORTS
 
 import logging
+import os
 from typing import ClassVar
 
 import mlflow
@@ -44,7 +45,8 @@ class MLFlowLogger(logging.Logger):
         super().__init__(name, level)
 
         # Get MLFlow run
-        if run_id is None:
+        mlflow_disabled = os.getenv("DISABLE_MLFLOW_LOGGING_FOR_TESTS", "0") == "1"
+        if run_id is None and not mlflow_disabled:
             active_run = mlflow.active_run()
             if active_run is None:
                 msg = "No active MLFlow run. Please start a run before logging."
@@ -64,13 +66,17 @@ class MLFlowLogger(logging.Logger):
 
     def log_param(self, param: str, value: object) -> None:
         """Log a parameter to MLflow and to the logger."""
-        mlflow.log_param(param, value)
+        mlflow_disabled = os.getenv("DISABLE_MLFLOW_LOGGING_FOR_TESTS", "0") == "1"
+        if not mlflow_disabled:
+            mlflow.log_param(param, value)
         self._log_mlflow(f"PARAM - {param}: {value!s}")
 
     def log_metric(self, metric: str, value: float, **kwargs: object) -> None:
         """Log a metric to MLflow and to the logger."""
-        filtered_kwargs = check_kwargs(kwargs, mlflow.log_metric)
-        mlflow.log_metric(metric, value, **filtered_kwargs)  # type: ignore[arg-type, unused-ignore, reportArgumentType]
+        mlflow_disabled = os.getenv("DISABLE_MLFLOW_LOGGING_FOR_TESTS", "0") == "1"
+        if not mlflow_disabled:
+            filtered_kwargs = check_kwargs(kwargs, mlflow.log_metric)
+            mlflow.log_metric(metric, value, **filtered_kwargs)  # type: ignore[arg-type, unused-ignore, reportArgumentType]
         self._log_mlflow(f"METRIC - {metric}: {value!s}")
 
 
