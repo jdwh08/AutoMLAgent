@@ -33,7 +33,14 @@ jobs:
 
     - name: Debug Show .pth files and content
       run: |
-        find .venv -name "*.pth" -exec echo {} \; -exec cat {} \;
+        for f in $(find .venv -name "*.pth"); do
+          echo "----- $f -----"
+          cat "$f"
+          echo
+        done
+
+    - name: Debug Print sys.path
+      run: python -c "import sys; print('\n'.join(sys.path))"
 
     # - name: Type check with mypy
     #   run: uv run mypy src/
