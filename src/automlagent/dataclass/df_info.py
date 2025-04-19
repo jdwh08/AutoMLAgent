@@ -15,15 +15,13 @@
 #####################################################
 ### IMPORTS
 
-import os
-
 import mlflow
 import polars as pl
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 ### OWN MODULES
-from AutoMLAgent.dataclass.column_info import ColumnInfo, create_column_info
-from AutoMLAgent.dataclass.column_type import ColumnType
+from automlagent.dataclass.column_info import ColumnInfo, create_column_info
+from automlagent.dataclass.column_type import ColumnType
 
 #####################################################
 ### SETTINGS
@@ -34,13 +32,6 @@ polars_temporal = (
     | pl.datatypes.Duration
     | pl.datatypes.Time
 )
-
-# MLFlow
-# mlflow.openai.autolog()
-mlflow.gemini.autolog()  # NOTE(jdwh08): doesn't really work
-mlflow.autolog()  # for modelling tasks
-mlflow.set_experiment(os.environ.get("MLFLOW_EXPERIMENT_NAME"))
-mlflow.config.enable_async_logging()
 
 
 #####################################################

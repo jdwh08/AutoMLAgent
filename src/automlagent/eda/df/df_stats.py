@@ -1,6 +1,6 @@
 #####################################################
 # AutoMLAgent [EDA COLUMN QUALITY]
-# ####################################################
+#####################################################
 # Jonathan Wang
 
 # ABOUT:
@@ -18,9 +18,11 @@
 import mlflow
 import polars as pl
 
-from AutoMLAgent.dataclass.column_info import ColumnInfo
-from AutoMLAgent.dataclass.df_info import DataFrameInfo
-from AutoMLAgent.eda.column.column_stats import (
+### OWN MODULES
+from automlagent.dataclass.column_info import ColumnInfo
+from automlagent.dataclass.column_type import ColumnType
+from automlagent.dataclass.df_info import DataFrameInfo
+from automlagent.eda.column.column_stats import (
     get_category_levels_for_column,
     get_histogram_bins_for_column,
     get_numerical_stats_for_column,
@@ -119,7 +121,7 @@ def get_string_stats(df: pl.DataFrame, df_info: DataFrameInfo) -> DataFrameInfo:
     column_infos = [
         column_info.model_copy(update=get_string_stats_for_column(df, column_info.name))
         for column_info in column_infos
-        if column_info.is_string
+        if column_info.type == ColumnType.TEXT
     ]
     df_info.column_info = column_infos
     return df_info

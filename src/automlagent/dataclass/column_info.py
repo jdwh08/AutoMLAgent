@@ -15,35 +15,20 @@
 #####################################################
 ### IMPORTS
 
-import os
+import datetime
 
 import mlflow
-import polars as pl
 from dotenv.main import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field
 
 ### OWN MODULES
-from AutoMLAgent.dataclass.column_type import ColumnType
+from automlagent.dataclass.column_type import ColumnType
+from automlagent.dataclass.polars_temporal import PolarsTemporal
 
 #####################################################
 ### SETTINGS
 
 load_dotenv()
-
-polars_temporal = (
-    pl.datatypes.Datetime
-    | pl.datatypes.Date
-    | pl.datatypes.Duration
-    | pl.datatypes.Time
-)
-
-# MLFlow
-# mlflow.openai.autolog()
-mlflow.gemini.autolog()  # NOTE(jdwh08): doesn't really work
-mlflow.autolog()  # for modelling tasks
-mlflow.set_experiment(os.environ.get("MLFLOW_EXPERIMENT_NAME"))
-mlflow.config.enable_async_logging()
-
 
 #####################################################
 ### DATACLASSES
@@ -102,9 +87,9 @@ class ColumnInfo(BaseModel):
     char_length_std: float | None = None
 
     # Temporal analysis fields
-    temporal_min: polars_temporal | None = None
-    temporal_max: polars_temporal | None = None
-    temporal_diff: polars_temporal | None = None
+    temporal_min: PolarsTemporal | None = None
+    temporal_max: PolarsTemporal | None = None
+    temporal_diff: datetime.timedelta | None = None
 
     # Flag to track if detailed analysis has been performed
     is_analyzed: bool = False

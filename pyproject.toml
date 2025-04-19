@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "AutoMLAgent"
-version = "2025.0.0.1"
+name = "automlagent"
+version = "0.0.1"
 description = "Prototype for Agentic AutoML"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,24 +20,24 @@ dependencies = [
     "mlflow>=2.21.2",
     "openai>=1.70.0",
 ]
-license = { "text" = "AGPL-3.0" }
+license = "GPL-3.0-or-later"
 license-files = ["LICEN[CS]E*"]
 keywords = ["AutoML", "Machine Learning", "Agents", "AI Agents"]
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
-  "Intended Audience :: Science/Research",
-  "Intended Audience :: Education",
-  "Intended Audience :: Developers",
-  "Topic :: Scientific/Engineering :: Artificial Intelligence",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.11",
-  "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
 ]
 
 [project.urls]
 Repository = "https://github.com/jdwh08/AutoMLAgent.git"
 
-[dependency-groups]
+[project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
@@ -50,7 +50,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/AutoMLAgent"]
+packages = ["src/automlagent"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -61,27 +61,31 @@ line-length = 88
 target-version = "py311"  # Python 3.11
 lint.select = ["ALL"]  # ALL DA RULES!
 lint.ignore = [
+    "BLE001", # Blind Except (not detecting error logging)
     "COM",    # flake8-commas
     "D100",   # Missing docstring in public module
     "D101",   # Missing docstring in public class
     "D102",   # Missing docstring in public method
     "D103",   # Missing docstring in public function
     "D104",   # Missing docstring in public package
+    "D203",   # Incorrect blank line before class
     "D213",   # Multi-line docstring closing quotes should be on a separate line
     # "D406",   # Section name should end with a newline
     # "D407",   # Missing dashed underline after section
     # "FBT",    # flake8-boolean-trap
-    # "G004",   # Logging statement uses f-string
-    # "PTH123", # open() should be replaced by Path.open()
-    "TD003",  # Missing issue link on the line following this TODO  (no issue link system yet)
+    "FIX002", # Code contains TODO (using for longer term planning)
     "G004",   # Logging statement uses f-string
     "RET504", # Unnecessary assignment before return (good for debugging)
-    "PD901",  # Avoid using df for `pd.DataFrame`
+    "TC001",  # Typing Only First Party Import (needed for pydantic basemodel compile)
+    "TD003",  # Missing issue link on the line following this TODO  (no issue link system yet)
 ]
 src = ["src"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101"]  # Use of Assert Detected (fine for tests)
+"tests/**/*.py" = [
+    "S101",  # Use of Assert Detected (fine for tests)
+    "PD901"  # Avoid using df for `pd.DataFrame`
+]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -92,7 +96,7 @@ line-ending = "auto"
 [tool.pyright]
 include = ["src"]
 exclude = ["**/node_modules", "**/__pycache__"]
-strict = ["src/AutoMLAgent"]
+strict = ["src/automlagent"]
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
 reportMissingTypeStubs = "warning"

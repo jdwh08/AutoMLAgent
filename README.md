@@ -2,6 +2,9 @@
 
 Prototype modular, agentic AutoML system for (tabular datasets for now).
 
+[![codecov](https://codecov.io/gh/jdwh08/AutoMLAgent/branch/main/graph/badge.svg)](https://codecov.io/gh/jdwh08/AutoMLAgent)
+ [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
 **Research Question**: Can agents achieve similar levels of performance as
 manual model training on benchmark /  Kaggleish datasets?
 
@@ -60,8 +63,13 @@ For now, we focus only on non-competition tabular kaggle datasets which I rememb
 ## Papers and References to Consider
 
 - AutoML <https://www.automl.org/wp-content/uploads/2019/05/AutoML_Book.pdf>
+- NNI <https://github.com/microsoft/nni>
 - Auto sklearn <https://github.com/automl/auto-sklearn/tree/development>
 - Feature Engine <https://feature-engine.trainindata.com/en/latest/index.html>
+- Feature Tools <https://github.com/alteryx/featuretools>
+- TPOT <https://github.com/EpistasisLab/tpot>
+- AILink <https://github.com/alibaba/Alink>
+- MLJar <https://github.com/mljar/mljar-supervised>
 
 ## Disclaimers and License
 
@@ -81,32 +89,31 @@ For now, we focus only on non-competition tabular kaggle datasets which I rememb
 ### Particularly Important Disclaimers
 
 This project is a proof of concept purely for research purposes
-and not intended for production, commercial, clinical, or other use.
+and not intended for commercial, production, clinical, or other use.
 
 The opinions, datasets, and methodologies expressed or used herein are solely my own
 or are publicly available, and do not reflect the views or opinions of my employer.
 
 This project does not guarantee any particular results, accuracy, or performance.
-The resulting models are not intended to be legal, medical, or any other professional advice.
+The resulting models are not intended to be used as professional advice in any way.
 
 While metrics may be included, users are strongly encouraged to validate on their datasets.
 The replication crisis is real.
-Testing on your own data is particularly true when considering real world risks
+Testing on your own data is particularly needed when considering real world risks
 such as bias, adversarial datasets, data compliance, etc.
 
 ### License (and Additional Disclaimers)
 
 This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, version 3 of the
-License.
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
+GNU General Public License for more details.
 
-You should have received a copy of the GNU Affero General Public License
+You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-Go open.
+Go open!
