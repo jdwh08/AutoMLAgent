@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "AutoMLAgent"
+name = "automlagent"
 version = "0.0.1"
 description = "Prototype for Agentic AutoML"
 readme = "README.md"
@@ -50,7 +50,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/AutoMLAgent"]
+packages = ["src/automlagent"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
