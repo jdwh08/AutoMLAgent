@@ -44,8 +44,10 @@ class MLFlowLogger(logging.Logger):
         # Initialize the parent Logger first with only parameters it accepts
         super().__init__(name, level)
 
-        # Get MLFlow run
+        # Check for settings
         mlflow_disabled = os.getenv("DISABLE_MLFLOW_LOGGING_FOR_TESTS", "0") == "1"
+
+        # Get MLFlow run
         if run_id is None and not mlflow_disabled:
             active_run = mlflow.active_run()
             if active_run is None:
@@ -53,11 +55,15 @@ class MLFlowLogger(logging.Logger):
                 raise RuntimeError(msg)
             run_id = str(active_run.info.run_id)  # type: ignore[reportUnknownMemberType, unused-ignore]
 
-        # Add custom logging level for MLflow
-        logging.addLevelName(self.mlflow_log_level, "MLFLOW")
-
-        # Log the run ID using the custom level
-        self._log_mlflow(f"Run ID: {run_id}")
+        # Handle settings
+        if mlflow_disabled:
+            self.propagate = True
+            self.handlers.clear()  # NOTE(jdwh08): pytest caplog capture
+        else:
+            # Add custom logging level for MLflow
+            logging.addLevelName(self.mlflow_log_level, "MLFLOW")
+            # Log the run ID using the custom level
+            self._log_mlflow(f"Run ID: {run_id}")
 
     def _log_mlflow(self, message: str) -> None:
         """Log messages at the MLflow level."""
