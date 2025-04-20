@@ -66,19 +66,14 @@ jobs:
     - name: Debug Print sys.path
       run: python -c "import sys; print('\n'.join(sys.path))"
 
-    - name: Type check with mypy.
+    - name: Type check with mypy. Warn only.
       run: uv run mypy src/ || true  # Log and warn only since return true
 
-    # NOTE: ruff requires py311 instead of 3.11
-    - name: Set target version from matrix
-      id: target_version
-      run: echo "version=py${{ matrix.python-version | replace('.', '') }}" >> $GITHUB_OUTPUT
-
-    - name: Lint code with Ruff.
-      run: uv run ruff check --output-format=github --target-version=${{ steps.target_version.outputs.version }} || true
+    - name: Lint code with Ruff. Warn only.
+      run: uv run ruff check --output-format=github || true
 
     - name: Check code formatting
-      run: uv run ruff format --check --diff --target-version=${{ steps.target_version.outputs.version }}
+      run: uv run ruff format --check --diff
 
     - name: Test with pytest
       run: uv run pytest --import-mode=importlib --junitxml=junit/test-results.xml --cov=src --cov-report=xml --cov-report=html
