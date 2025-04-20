@@ -1,11 +1,10 @@
 # Additional files to gitignore
+*.zip
+
+# Additional folders to gitignore
 ^archive/
 mlruns/
-*.zip
-AutoMLAgent.pdf
-ui_notes.md
-vllm_model_notes.md
-todo.md
+papers/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

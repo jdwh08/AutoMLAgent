@@ -2,16 +2,16 @@
 
 ## Active Work
 
-- Develop EDA agent for profiling and reporting
-- Create test suite for column-based analysis
+### Develop EDA agent for profiling and reporting
+
 - Handle table-level EDA such as correlations, tests, and feature relationships
+  - Correlation report
+  - Target to feature category distribution
 
-## Milestones
+- Data Quality Improvements
+  - Small dataset size (10, 1000) warning
+  - Duplicate Rows
 
-- [ ] EDA agent MVP
-- [ ] Feature engineering agent
-- [ ] Model selection & training agent
-- [ ] Hyperparameter optimization agent
-- [ ] Evaluation/reporting agent
-- [ ] Orchestration agent for pipeline automation
-- [ ] End-to-end AutoML pipeline demo on public tabular dataset
+- Feature Importance
+  - Categorical: Discriminative power?
+  - Regression: Correlation?
