@@ -26,6 +26,7 @@ from automlagent.dataclass.column_type import ColumnType
 from automlagent.eda.column.column_quality import (
     column_data_quality_categorical_handler,
     column_data_quality_missing_check,
+    column_data_quality_missing_inf,
     column_data_quality_numeric,
     column_data_quality_temporal_handler,
     get_data_quality_for_column,
@@ -45,6 +46,42 @@ class TestUnitColumnQuality:
     ) -> None:
         with pytest.raises(KeyError, match="Column 'col2' not found in DataFrame."):
             column_data_quality_missing_check(basic_float_df, "col2")
+
+    def test_column_all_missing(
+        self,
+    ) -> None:
+        missing_arr = [None] * 3
+        df = pl.DataFrame({"col": missing_arr})
+        res = column_data_quality_missing_inf(df, "col")
+        assert res == {
+            "missing_count": len(missing_arr),
+            "missing_rate": 1.0,
+            "inf_count": 0,
+        }
+
+    def test_column_some_missing_inf(
+        self,
+    ) -> None:
+        missing_arr = [None, None, None, 3.1415926, 2.7182818, float("inf")]
+        df = pl.DataFrame({"col": missing_arr})
+        res = column_data_quality_missing_inf(df, "col")
+        assert res == {
+            "missing_count": 3,
+            "missing_rate": 0.5,
+            "inf_count": 1,
+        }
+
+    def test_column_all_missing_check(
+        self,
+    ) -> None:
+        missing_arr = [None, None, None] * 3
+        df = pl.DataFrame({"col": missing_arr})
+        res = column_data_quality_missing_check(df, "col")
+        assert res == {
+            "outlier_count": 0,
+            "outlier_rate": 0.0,
+            "has_low_variation": True,
+        }
 
     def test_numeric_non_numeric_column(self) -> None:
         """Covers fallback/exception path at end of column_data_quality_numeric."""

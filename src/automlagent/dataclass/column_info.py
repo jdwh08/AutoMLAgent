@@ -23,17 +23,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 ### OWN MODULES
 from automlagent.dataclass.column_type import ColumnType
-from automlagent.dataclass.polars_temporal import PolarsTemporal
 
 #####################################################
 ### SETTINGS
 
 load_dotenv()
 
+
 #####################################################
 ### DATACLASSES
-
-
 class ColumnInfo(BaseModel):
     """Information about a single column."""
 
@@ -53,12 +51,17 @@ class ColumnInfo(BaseModel):
     # Data Quality
     missing_count: int | None = None
     missing_rate: float | None = None
+    inf_count: int | None = None
     outlier_count: int | None = None
     outlier_rate: float | None = None
     has_low_variation: bool = False
 
     # Info string
-    info: str = Field(default="")
+    description: str = Field(
+        default="",
+        description="Description of column data meaning (and levels if exists).",
+    )
+    info: str = Field(default="", description="EDA information string.")
 
     # Sample values
     sample_values: list[str] | None = None
@@ -87,8 +90,8 @@ class ColumnInfo(BaseModel):
     char_length_std: float | None = None
 
     # Temporal analysis fields
-    temporal_min: PolarsTemporal | None = None
-    temporal_max: PolarsTemporal | None = None
+    temporal_min: datetime.date | datetime.datetime | None = None
+    temporal_max: datetime.date | datetime.datetime | None = None
     temporal_diff: datetime.timedelta | None = None
 
     # Flag to track if detailed analysis has been performed

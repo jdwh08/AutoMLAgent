@@ -12,11 +12,16 @@
 #####################################################
 ### BOARD
 
+# TODO(jdwh08): Better categorical column detection
+# parameter-specified values?
+# LLM-judged based on column description if exists?
+
 #####################################################
 ### IMPORTS
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, TypeAlias
 
 import mlflow
@@ -189,12 +194,12 @@ def get_type_for_column(
             output["cardinality"] = cardinality
         except Exception:
             logger.exception(f"Failed to calculate cardinality for {column_name}")
-            cardinality = len(df)  # assume worse case
+            cardinality = df.shape[0]  # assume worse case
             output["cardinality"] = cardinality
 
     # Calculate cardinality threshold based on dataset size
     cardinality_threshold = min(
-        int(len(df) * MAX_CATEGORICAL_RATIO), DEFAULT_CATEGORICAL_THRESHOLD
+        math.ceil(df.shape[0] * MAX_CATEGORICAL_RATIO), DEFAULT_CATEGORICAL_THRESHOLD
     )
     cardinality_threshold = max(cardinality_threshold, DEFAULT_CATEGORICAL_THRESHOLD)
 

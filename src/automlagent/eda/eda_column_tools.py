@@ -26,7 +26,10 @@ from automlagent.dataclass.column_info import ColumnInfo
 from automlagent.dataclass.column_type import ColumnType
 from automlagent.dataclass.df_info import DataFrameInfo
 from automlagent.eda.column.column_info_string import generate_info_string_for_column
-from automlagent.eda.column.column_quality import get_data_quality_for_column
+from automlagent.eda.column.column_quality import (
+    column_data_quality_missing_inf,
+    get_data_quality_for_column,
+)
 from automlagent.eda.column.column_stats import (
     get_category_levels_for_column,
     get_histogram_bins_for_column,
@@ -70,14 +73,8 @@ def analyze_column_missing_value_handler(
     column_name: str,
     column_info: ColumnInfo,
 ) -> ColumnInfo:
-    total_rows = len(df)
-    missing_count = df[column_name].null_count()
-    column_info = column_info.model_copy(
-        update={
-            "missing_count": missing_count,
-            "missing_rate": missing_count / total_rows if total_rows > 0 else 0.0,
-        }
-    )
+    missing_inf_data = column_data_quality_missing_inf(df, column_name)
+    column_info = column_info.model_copy(update=missing_inf_data)
     return column_info
 
 

@@ -22,6 +22,9 @@ from typing import TYPE_CHECKING, TypeAlias
 
 import mlflow
 import polars as pl
+import polars.selectors as cs
+
+from automlagent.eda.column.column_utils import column_filter_out_missing
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -40,10 +43,8 @@ ColumnDataQualityMetrics: TypeAlias = dict[str, int | float | bool]
 
 #####################################################
 ### CODE
-
-
-@mlflow.trace(name="column_data_quality_missing_check", span_type="func")
-def column_data_quality_missing_check(
+@mlflow.trace(name="column_data_quality_missing", span_type="func")
+def column_data_quality_missing_inf(
     df: pl.DataFrame,
     column_name: str,
 ) -> ColumnDataQualityMetrics:
@@ -58,13 +59,62 @@ def column_data_quality_missing_check(
         Empty dict otherwise.
 
     """
+    column = pl.col(column_name)
+
+    df_no_missing = column_filter_out_missing(df, column_name)
+    num_missing = df.height - df_no_missing.height
+
+    inf_count = 0
+    # NOTE(jdwh08): Only numeric columns can have infinite values
+    if column_name in df.select(cs.numeric()).columns:
+        inf_count = df.select(
+            column.filter(column.is_infinite()).alias(column_name)
+        ).height
+
+    output = {
+        "missing_count": num_missing,
+        "missing_rate": num_missing / df.height,
+        "inf_count": inf_count,
+    }
+    return output
+
+
+def column_data_quality_missing_check(
+    df: pl.DataFrame,
+    column_name: str,
+    column_info: ColumnInfo | None = None,
+) -> ColumnDataQualityMetrics:
+    """Analyze data quality for a column with missing values.
+
+    Args:
+        df: The input dataframe
+        column_name: Name of the column to analyze
+        column_info: Optional ColumnInfo object
+
+    Returns:
+        ColumnDataQualityMetrics: If all nulls, populate.
+        Empty dict otherwise.
+
+    """
     if column_name not in df.columns:
         msg = f"Column '{column_name}' not found in DataFrame."
         raise KeyError(msg)
 
     # Check if all nulls
     result: ColumnDataQualityMetrics = {}
-    if df[column_name].is_null().all():
+    if column_info is None:
+        column_info = ColumnInfo(name=column_name)
+
+    if column_info.missing_rate is None:
+        column_info = column_info.model_copy(
+            update=column_data_quality_missing_inf(df, column_name)
+        )
+        if column_info.missing_rate is None:
+            msg = f"Failed to calculate missing rate for column {column_name}"
+            raise ValueError(msg)
+
+    # If all nulls, return this default result
+    if column_info.missing_rate >= 1.0:
         result["outlier_count"] = 0
         result["outlier_rate"] = 0.0
         result["has_low_variation"] = True
@@ -93,7 +143,7 @@ def column_data_quality_numeric(
 
     """
     result: ColumnDataQualityMetrics = column_data_quality_missing_check(
-        df, column_name
+        df, column_name, column_info
     )
     if result != {}:
         return result
@@ -164,7 +214,7 @@ def column_data_quality_categorical_handler(
 
     """
     result: ColumnDataQualityMetrics = column_data_quality_missing_check(
-        df, column_name
+        df, column_name, column_info
     )
     if result != {}:
         return result
@@ -198,7 +248,7 @@ def column_data_quality_categorical_handler(
 def column_data_quality_temporal_handler(
     df: pl.DataFrame,
     column_name: str,
-    column_info: ColumnInfo | None = None,  # noqa: ARG001
+    column_info: ColumnInfo | None = None,
 ) -> ColumnDataQualityMetrics:
     """Analyze data quality for a temporal column (DATETIME, DATE, TIME).
 
@@ -212,7 +262,7 @@ def column_data_quality_temporal_handler(
 
     """
     result: ColumnDataQualityMetrics = column_data_quality_missing_check(
-        df, column_name
+        df, column_name, column_info
     )
     if result != {}:
         return result
