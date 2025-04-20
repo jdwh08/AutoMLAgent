@@ -17,7 +17,7 @@
             "name": "Python: Module",
             "type": "debugpy",
             "request": "launch",
-            "module": "lift_processor.${fileBasenameNoExtension}",
+            "module": "automlagent.${fileBasenameNoExtension}",
             "justMyCode": true,
             "cwd": "${workspaceFolder}",
             "env": {
@@ -31,16 +31,18 @@
             "program": "-m",
             "args": [
                 "pytest",
+                "--import-mode=importlib",
+                "tests",
                 "-v",
                 "--no-cov",
                 "${file}"
             ],
             "console": "integratedTerminal",
             "justMyCode": true,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src",
-                "PYTEST_ADDOPTS": "--no-cov"
-            },
+            // "env": {
+            //     "PYTHONPATH": "${workspaceFolder}/src",
+            //     "PYTEST_ADDOPTS": "--no-cov"
+            // },
             "purpose": [
                 "debug-test"
             ],

@@ -23,6 +23,14 @@ jobs:
       with:
         python-version-file: "pyproject.toml"
 
+    - name: Cache Python venv
+      uses: actions/cache@v4
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+        restore-keys: |
+          venv-${{ runner.os }}-
+
     - name: Install dependencies
       run: |
         uv venv
@@ -52,7 +60,7 @@ jobs:
       run: uv run ruff format --check --diff --target-version=py311
 
     - name: Test with pytest
-      run: uv run pytest --junitxml=junit/test-results.xml --cov=src --cov-report=xml --cov-report=html
+      run: uv run pytest --import-mode=importlib --junitxml=junit/test-results.xml --cov=src --cov-report=xml --cov-report=html
 
     - name: Upload JUnit test results
       uses: actions/upload-artifact@v4

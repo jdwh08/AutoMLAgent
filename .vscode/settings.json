@@ -7,7 +7,7 @@
     "python.analysis.indexing": true,
     "python.analysis.packageIndexDepths": [
         {
-            "name": "lift_processor",
+            "name": "automlagent",
             "depth": 5
         }
     ],
