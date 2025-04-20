@@ -4,7 +4,7 @@ Prototype modular, agentic AutoML system for (tabular datasets for now).
 
 [![CI](https://github.com/jdwh08/AutoMLAgent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jdwh08/AutoMLAgent/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/jdwh08/AutoMLAgent/branch/main/graph/badge.svg)](https://codecov.io/gh/jdwh08/AutoMLAgent)
-![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 **Research Question**: Can agents achieve similar levels of performance as
