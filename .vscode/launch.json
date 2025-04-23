@@ -30,8 +30,6 @@
             "request": "launch",
             "program": "-m",
             "args": [
-                "pytest",
-                "--import-mode=importlib",
                 "tests",
                 "-v",
                 "--no-cov",
@@ -39,10 +37,10 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": true,
-            // "env": {
-            //     "PYTHONPATH": "${workspaceFolder}/src",
-            //     "PYTEST_ADDOPTS": "--no-cov"
-            // },
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "PYTEST_ADDOPTS": "--no-cov"
+            },
             "purpose": [
                 "debug-test"
             ],

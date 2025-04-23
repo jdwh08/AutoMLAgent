@@ -1,5 +1,5 @@
 #####################################################
-# AutoMLAgent [EDA COLUMN TYPE]
+# AutoMLAgent [EDA DATAFRAME TYPES]
 #####################################################
 # Jonathan Wang
 

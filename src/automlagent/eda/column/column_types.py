@@ -42,11 +42,38 @@ from automlagent.logger.mlflow_logger import get_mlflow_logger
 #####################################################
 ### SETTINGS
 
-ColumnTypeDict: TypeAlias = dict[str, ColumnType | bool | int]
+ColumnTypeDict: TypeAlias = dict[str, ColumnType | bool | int | float]
 
 
 #####################################################
 ### CODE
+def _get_cardinality(
+    df: pl.DataFrame, column_name: str, input_dict: ColumnTypeDict
+) -> ColumnTypeDict:
+    """Get the cardinality of a column in a dataframe.
+
+    Args:
+        df (pl.DataFrame): The dataframe to get the cardinality from.
+        column_name (str): The name of the column to get the cardinality for.
+        input_dict (dict[str, object]): The input dictionary containing column info.
+
+    Returns:
+        dict[str, object]: We add cardinality info to the input dictionary.
+
+    """
+    cardinality: int = 99999  # NOTE(jdwh08): default very high (non-categorical)
+    output = input_dict.copy()
+    try:
+        cardinality = df[column_name].n_unique()
+    except Exception:
+        logger = get_mlflow_logger()
+        logger.exception(f"Failed to calculate cardinality for {column_name}")
+        cardinality = len(df)  # assume worse case
+    output["cardinality"] = cardinality
+    output["unique_rate"] = cardinality / len(df) if len(df) > 0 else 0
+    return output
+
+
 def initialize_output_dict(
     df: pl.DataFrame, column_name: str, column_info: ColumnInfo | None
 ) -> ColumnTypeDict:
@@ -54,16 +81,8 @@ def initialize_output_dict(
     output: ColumnTypeDict = {}
 
     # Calculate cardinality if not already known
-    cardinality: int = 99999  # NOTE(jdwh08): default very high (non-categorical)
     if column_info is None or column_info.cardinality is None:
-        try:
-            cardinality = df[column_name].n_unique()
-            output["cardinality"] = cardinality
-        except Exception:
-            logger = get_mlflow_logger()
-            logger.exception(f"Failed to calculate cardinality for {column_name}")
-            cardinality = len(df)  # assume worse case
-            output["cardinality"] = cardinality
+        output = _get_cardinality(df, column_name, output)
 
     # Initialize type attributes
     output["type"] = ColumnType.UNKNOWN
@@ -170,7 +189,7 @@ def get_type_for_column(
     column_name: str,
     *,
     column_info: ColumnInfo | None = None,
-) -> dict[str, ColumnType | bool | int]:
+) -> ColumnTypeDict:
     """Get the type of a column in a dataframe.
 
     Args:
@@ -184,18 +203,20 @@ def get_type_for_column(
 
     """
     logger = get_mlflow_logger()
-    output: dict[str, ColumnType | bool | int] = {}
+    output: ColumnTypeDict = {}
 
     # Calculate cardinality if not already known
-    cardinality: int = 99999
     if column_info is None or column_info.cardinality is None:
-        try:
-            cardinality = df[column_name].n_unique()
-            output["cardinality"] = cardinality
-        except Exception:
-            logger.exception(f"Failed to calculate cardinality for {column_name}")
-            cardinality = df.shape[0]  # assume worse case
-            output["cardinality"] = cardinality
+        output = _get_cardinality(df, column_name, output)
+    else:
+        output["cardinality"] = column_info.cardinality
+        output["unique_rate"] = column_info.cardinality / df.height
+    cardinality = output["cardinality"]
+
+    if not isinstance(cardinality, int):  # pragma: no coverage <for type checker>
+        msg = f"Expected integer cardinality, got {type(cardinality)}"
+        logger.error(msg)
+        raise TypeError(msg)
 
     # Calculate cardinality threshold based on dataset size
     cardinality_threshold = min(
@@ -209,11 +230,11 @@ def get_type_for_column(
     output["is_numeric"] = False
     output["is_temporal"] = False
 
-    try:
-        # Check if column exists
-        if column_name not in df.columns:
-            return output
+    # Check if column exists
+    if column_name not in df.columns:
+        return output
 
+    try:
         # Get handlers
         type_handlers = create_column_type_handlers(
             df=df, column_name=column_name, cardinality=cardinality

@@ -48,8 +48,6 @@ class DataFrameInfo(BaseModel):
     num_cols: int
 
     # Data Quality
-    has_duplicate_rows: bool = False
-
     @computed_field
     @property
     def missing_value_cols(self) -> list[str]:
@@ -63,7 +61,10 @@ class DataFrameInfo(BaseModel):
     column_info: list[ColumnInfo] = Field(default_factory=list)
 
     # Correlation matrix
-    correlation_matrix: pl.DataFrame | None = None
+    correlation_pearson: pl.DataFrame | None = Field(
+        default=None,
+        description="Pearson correlation matrix for numerical columns.",
+    )
 
     # Helper properties for convenience
     @computed_field

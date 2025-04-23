@@ -82,6 +82,10 @@ class TestColumnStats:
         assert result["mean"] == np.mean(arr)
         assert result["median"] == np.median(arr)
         assert result["std"] == np.std(arr, ddof=1)
+        assert result["p5"] == np.quantile(arr, 0.05)
+        assert result["q1"] == np.quantile(arr, 0.25)
+        assert result["q3"] == np.quantile(arr, 0.75)
+        assert result["p95"] == np.quantile(arr, 0.95)
         assert result["skewness"] == skew(arr)
         assert result["kurtosis"] == kurtosis(arr)
 

@@ -194,8 +194,19 @@ def get_numerical_stats_for_column(
         "max": df_filtered.select(pl.col(column_name).max()).item(),
         "mean": df_filtered.select(pl.col(column_name).mean()).item(),
         "median": df_filtered.select(pl.col(column_name).median()).item(),
-        "q1": df_filtered.select(pl.col(column_name).quantile(0.25)).item(),
-        "q3": df_filtered.select(pl.col(column_name).quantile(0.75)).item(),
+        # NOTE(jdwh08): "linear" approximates values like NumPy
+        "p5": df_filtered.select(
+            pl.col(column_name).quantile(0.05, interpolation="linear")
+        ).item(),
+        "q1": df_filtered.select(
+            pl.col(column_name).quantile(0.25, interpolation="linear")
+        ).item(),
+        "q3": df_filtered.select(
+            pl.col(column_name).quantile(0.75, interpolation="linear")
+        ).item(),
+        "p95": df_filtered.select(
+            pl.col(column_name).quantile(0.95, interpolation="linear")
+        ).item(),
         "std": df_filtered.select(pl.col(column_name).std()).item(),
         "skewness": df_filtered.select(pl.col(column_name).skew()).item(),
         "kurtosis": df_filtered.select(pl.col(column_name).kurtosis()).item(),

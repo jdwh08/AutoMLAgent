@@ -12,6 +12,12 @@
 #####################################################
 ### BOARD
 
+# TODO(jdwh08): Add Zeros / Zero_Rate?
+# TODO(jdwh08): Add Coefficient of Variation?
+# TODO(jdwh08): Add Q-Q against Normal Distribution?
+
+# TODO(jdwh08): Add graphs for KDE / Q-Q?
+
 #####################################################
 ### IMPORTS
 
@@ -68,6 +74,7 @@ class ColumnInfo(BaseModel):
 
     # Categorical analysis fields
     cardinality: int | None = None
+    unique_rate: float | None = None
     category_counts: dict[str, int] = Field(default_factory=dict)
 
     # Numeric analysis fields
@@ -75,8 +82,10 @@ class ColumnInfo(BaseModel):
     max: float | None = None
     mean: float | None = None
     median: float | None = None
+    p5: float | None = None
     q1: float | None = None
     q3: float | None = None
+    p95: float | None = None
     std: float | None = None
     skewness: float | None = None
     kurtosis: float | None = None

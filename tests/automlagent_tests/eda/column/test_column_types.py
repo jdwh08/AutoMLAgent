@@ -12,6 +12,7 @@
 ### IMPORTS
 
 import datetime
+from typing import Never
 
 import polars as pl
 import pytest
@@ -20,6 +21,8 @@ import pytest
 from automlagent.dataclass.column_info import ColumnInfo
 from automlagent.dataclass.column_type import ColumnType
 from automlagent.eda.column.column_types import (
+    ColumnTypeDict,
+    _get_cardinality,  # type: ignore[reportPrivateUsage]
     create_column_type_handlers,
     get_type_for_column,
     initialize_output_dict,
@@ -64,12 +67,15 @@ class TestUnitColumnTypes:
         out = initialize_output_dict(df_all_types, col, None)
         assert set(out.keys()) == {
             "cardinality",
+            "unique_rate",
             "type",
             "is_categorial",
             "is_numeric",
             "is_temporal",
         }
         assert isinstance(out["cardinality"], int)
+        assert isinstance(out["unique_rate"], float)
+        assert out["unique_rate"] == out["cardinality"] / df_all_types.height
         assert out["type"] == ColumnType.UNKNOWN
         assert out["is_categorial"] is False
         assert out["is_numeric"] is False
@@ -81,6 +87,7 @@ class TestUnitColumnTypes:
         """Test initialize_output_dict handles missing column gracefully."""
         out = initialize_output_dict(df_all_types, "not_a_col", None)
         assert out["cardinality"] == df_all_types.height
+        assert out["unique_rate"] == 1.0
         assert out["type"] == ColumnType.UNKNOWN
 
     def test_initialize_output_dict_empty_df(self) -> None:
@@ -88,6 +95,7 @@ class TestUnitColumnTypes:
         df = pl.DataFrame({"col": []})
         out = initialize_output_dict(df, "col", None)
         assert out["cardinality"] == 0
+        assert out["unique_rate"] == 0.0
         assert out["type"] == ColumnType.UNKNOWN
 
     @pytest.mark.parametrize(
@@ -109,7 +117,7 @@ class TestUnitColumnTypes:
         handlers = create_column_type_handlers(
             df_all_types, col_name, df_all_types[col_name].n_unique()
         )
-        output = {
+        output: ColumnTypeDict = {
             "type": ColumnType.UNKNOWN,
             "is_categorial": False,
             "is_numeric": False,
@@ -128,7 +136,7 @@ class TestUnitColumnTypes:
         col_name = "int_col"
         cardinality = 1000
         handlers = create_column_type_handlers(df_all_types, col_name, cardinality)
-        output = {
+        output: ColumnTypeDict = {
             "type": ColumnType.UNKNOWN,
             "is_categorial": False,
             "is_numeric": False,
@@ -156,8 +164,11 @@ class TestUnitColumnTypes:
         self, df_all_types: pl.DataFrame, col_name: str, expected_type: ColumnType
     ) -> None:
         """Test get_type_for_column returns correct type for each supported dtype."""
-        out = get_type_for_column(df_all_types, col_name)
+        out: ColumnTypeDict = get_type_for_column(df_all_types, col_name)
         assert out["type"] == expected_type
+        assert isinstance(out["cardinality"], int)
+        assert out["cardinality"] == df_all_types[col_name].n_unique()
+        assert out["unique_rate"] == out["cardinality"] / df_all_types.height
 
     def test_get_type_for_column_with_column_info(
         self, df_all_types: pl.DataFrame
@@ -165,29 +176,44 @@ class TestUnitColumnTypes:
         """Test get_type_for_column uses ColumnInfo if provided."""
         col_name = "int_col"
         ci = ColumnInfo(name=col_name, cardinality=2)
-        out = get_type_for_column(df_all_types, col_name, column_info=ci)
+        out: ColumnTypeDict = get_type_for_column(
+            df_all_types, col_name, column_info=ci
+        )
         assert out["type"] == ColumnType.INTEGER
+        assert isinstance(ci.cardinality, int)
+        assert out["cardinality"] == ci.cardinality
+        assert out["unique_rate"] == ci.cardinality / df_all_types.height
 
     def test_get_type_for_column_missing_column(
         self, df_all_types: pl.DataFrame
     ) -> None:
         """Test get_type_for_column returns UNKNOWN for missing column."""
-        out = get_type_for_column(df_all_types, "not_a_col")
+        out: ColumnTypeDict = get_type_for_column(df_all_types, "not_a_col")
         assert out["type"] == ColumnType.UNKNOWN
+        assert out["cardinality"] == df_all_types.height
+        assert out["unique_rate"] == 1.0
 
     def test_get_type_for_column_all_nulls(self) -> None:
         """Test get_type_for_column handles all-null columns."""
         df = pl.DataFrame({"col": [None, None, None]})
-        out = get_type_for_column(df, "col")
+        out: ColumnTypeDict = get_type_for_column(df, "col")
         assert out["type"] == ColumnType.UNKNOWN
-        assert out["cardinality"] == 1 or out["cardinality"] == 0
+        assert out["cardinality"] == 1
+        assert out["unique_rate"] == 1 / 3
 
     def test_get_type_for_column_empty_df(self) -> None:
         """Test get_type_for_column handles empty DataFrame."""
         df = pl.DataFrame({"col": []})
-        out = get_type_for_column(df, "col")
+        out: ColumnTypeDict = get_type_for_column(df, "col")
         assert out["type"] == ColumnType.UNKNOWN
         assert out["cardinality"] == 0
+        assert out["unique_rate"] == 0
+
+    def test_get_type_for_column_unique_rate_normal(self) -> None:
+        """Test get_type_for_column sets correct unique_rate for normal columns."""
+        df = pl.DataFrame({"col": [1, 2, 2, 3]})
+        out: ColumnTypeDict = get_type_for_column(df, "col")
+        assert out["unique_rate"] == 3 / 4
 
     def test_get_type_for_column_high_cardinality(self) -> None:
         """Test get_type_for_column sets is_categorial False for high cardinality."""
@@ -202,5 +228,20 @@ class TestUnitColumnTypes:
         out = get_type_for_column(df, "col")
         assert out["is_categorial"] is True
 
-    # NOTE(jdwh08): We had a test for different dtypes in one column,
-    # but that resulted in polars -> string coerce, or polars errors.
+    def test_get_cardinality_exception_fallback(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test _get_cardinality fallback logic when n_unique raises exception."""
+
+        class TestingError(Exception):
+            pass
+
+        def fail_n_unique() -> Never:
+            msg = "FAILED! Dunno why polars allows this for some types but it does."
+            raise TestingError(msg)
+
+        df = pl.DataFrame({"col": [1, 2, 3]})
+        monkeypatch.setattr(df["col"], "n_unique", fail_n_unique)
+        out = _get_cardinality(df, "col", {})
+        assert out["cardinality"] == len(df)
+        assert out["unique_rate"] == 1.0
