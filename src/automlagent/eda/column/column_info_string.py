@@ -124,7 +124,9 @@ def _info_string_numerical_histogram_section(column_info: ColumnInfo) -> str:
 
     # Get numerical histogram data
     numerical_histogram = {
-        k: v for k, v in column_info.histogram.items() if isinstance(k, tuple)
+        k: v
+        for k, v in column_info.histogram.items()
+        if k.startswith("[") and k.endswith("]")
     }
 
     if not numerical_histogram:
@@ -137,10 +139,21 @@ def _info_string_numerical_histogram_section(column_info: ColumnInfo) -> str:
     output_strings.append("|-----------|-------|")
 
     # Sort by bin start value
-    sorted_bins = sorted(numerical_histogram.items(), key=lambda x: x[0][0])
+    sorted_bins = sorted(
+        numerical_histogram.items(),
+        key=lambda x: float("-inf")
+        if x[0].startswith("[-inf")
+        else float(x[0].strip("[]").split(",")[0]),
+    )
 
-    for (bin_start, bin_end), count in sorted_bins:
-        bin_range = f"{bin_start:.2f} to {bin_end:.2f}"
+    for bin_key, count in sorted_bins:
+        # Parse the bin key
+        bounds = bin_key.strip("[]").split(",")
+        bin_start = bounds[0]
+        bin_end = bounds[1]
+
+        # Format the range for display
+        bin_range = f"{bin_start} to {bin_end}"
         output_strings.append(f"| {bin_range} | {count} |")
 
     output = "\n".join(output_strings)

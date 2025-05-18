@@ -5,7 +5,9 @@ import pytest
 
 from automlagent.utils.histogram_utils import (
     create_histogram,
+    format_histogram_bin_key,
     freedman_diaconis_bins,
+    parse_histogram_bin_key,
     sturges_bins,
 )
 
@@ -46,13 +48,33 @@ class TestHistogramUtils:
         assert isinstance(num_bins, int)
         assert num_bins > 0
 
+    def testformat_histogram_bin_key(self) -> None:
+        """Test bin key formatting."""
+        # Test normal case
+        key = format_histogram_bin_key(1.0, 2.0)
+        assert key == "[1.0000000000,2.0000000000]"
+
+        # Test infinity cases
+        inf_key = format_histogram_bin_key(float("-inf"), float("inf"))
+        assert inf_key == "[-inf,inf]"
+
+        # Test parsing back
+        lower, upper = parse_histogram_bin_key(key)
+        assert lower == 1.0
+        assert upper == 2.0
+
+        # Test parsing infinity
+        lower, upper = parse_histogram_bin_key(inf_key)
+        assert lower == float("-inf")
+        assert upper == float("inf")
+
     def test_create_histogram_numerical_df(
         self, sample_numerical_df: pl.DataFrame
     ) -> None:
         """Test histogram creation from numerical DataFrame."""
         histogram = create_histogram(sample_numerical_df, "numeric")
         assert histogram is not None
-        assert all(isinstance(k, tuple) for k in histogram)
+        assert all(k.startswith("[") and k.endswith("]") for k in histogram)
         assert all(isinstance(v, int) for v in histogram.values())
 
     def test_create_histogram_numerical_series(
@@ -62,7 +84,7 @@ class TestHistogramUtils:
         """Test histogram creation from numerical Series."""
         histogram = create_histogram(sample_numerical_series)
         assert histogram is not None
-        assert all(isinstance(k, tuple) for k in histogram)
+        assert all(k.startswith("[") and k.endswith("]") for k in histogram)
         assert all(isinstance(v, int) for v in histogram.values())
 
     def test_create_histogram_categorical_df(
@@ -113,7 +135,7 @@ class TestHistogramUtils:
         series_with_nulls = pl.Series("with_nulls", [1.0, None, 3.0, None, 5.0])
         histogram = create_histogram(series_with_nulls)
         assert histogram is not None
-        assert all(isinstance(k, tuple) for k in histogram)
+        assert all(k.startswith("[") and k.endswith("]") for k in histogram)
         assert all(isinstance(v, int) for v in histogram.values())
 
     def test_create_histogram_invalid_column(self) -> None:
@@ -136,9 +158,9 @@ class TestHistogramUtils:
         assert histogram is not None
 
         # Check for -inf bin
-        inf_bins = [k for k in histogram if k[0] == float("-inf")]
+        inf_bins = [k for k in histogram if k.startswith("[-inf")]
         assert len(inf_bins) == 1
 
         # Check for +inf bin
-        inf_bins = [k for k in histogram if k[1] == float("inf")]
+        inf_bins = [k for k in histogram if k.endswith(",inf]")]
         assert len(inf_bins) == 1

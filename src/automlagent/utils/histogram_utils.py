@@ -16,7 +16,7 @@
 ### IMPORTS
 
 import math
-from typing import Protocol, cast, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 import mlflow
 import polars as pl
@@ -152,10 +152,57 @@ def _create_categorical_histogram(data: pl.Series) -> dict[str, int]:
     return histogram_data
 
 
+def format_histogram_bin_key(lower: float, upper: float) -> str:
+    """Format bin range as a string that preserves numerical ordering.
+
+    Args:
+        lower (float): Lower bound of the bin
+        upper (float): Upper bound of the bin
+
+    Returns:
+        str: Formatted string representation of the bin range
+
+    """
+    # Handle infinity cases
+    if lower == float("-inf"):
+        lower_str = "-inf"
+    else:
+        lower_str = f"{lower:.10f}"
+
+    if upper == float("inf"):
+        upper_str = "inf"
+    else:
+        upper_str = f"{upper:.10f}"
+
+    return f"[{lower_str},{upper_str}]"
+
+
+def parse_histogram_bin_key(bin_key: str) -> tuple[float, float]:
+    """Parse a bin key string back into a tuple of floats.
+
+    Args:
+        bin_key (str): String representation of the bin range
+
+    Returns:
+        tuple[float, float]: Lower and upper bounds of the bin
+
+    """
+    # Remove brackets and split
+    bounds = bin_key.strip("[]").split(",")
+    if len(bounds) != 2:
+        raise ValueError(f"Invalid bin key format: {bin_key}")
+
+    # Parse bounds
+    lower = float("-inf") if bounds[0] == "-inf" else float(bounds[0])
+    upper = float("inf") if bounds[1] == "inf" else float(bounds[1])
+
+    return (lower, upper)
+
+
 def _create_numerical_histogram(
     data: pl.Series,
     bin_calculator: HistogramBinCalculator | None = None,
-) -> dict[tuple[float, float], int]:
+) -> dict[str, int]:
     """Create a histogram for numerical data.
 
     Args:
@@ -164,7 +211,7 @@ def _create_numerical_histogram(
             Defaults to None, for Polars default.
 
     Returns:
-        dict[tuple[float, float], int]: Dictionary mapping bin ranges to counts.
+        dict[str, int]: Dictionary mapping bin ranges to counts.
 
     """
     logger = get_mlflow_logger()
@@ -183,10 +230,10 @@ def _create_numerical_histogram(
         return {}
 
     # Process histogram data
-    histogram_data: dict[tuple[float, float], int] = {}
+    histogram_data: dict[str, int] = {}
 
     # Add bin for values below minimum
-    histogram_data[(float("-inf"), data_min)] = 0
+    histogram_data[format_histogram_bin_key(float("-inf"), data_min)] = 0
 
     for row in histogram.rows():
         _, category, count = row
@@ -202,13 +249,13 @@ def _create_numerical_histogram(
         try:
             lower = float(bounds[0].strip())
             upper = float(bounds[1].strip())
-            histogram_data[(lower, upper)] = count
+            histogram_data[format_histogram_bin_key(lower, upper)] = count
         except ValueError:
             logger.exception(f"Failed to convert bounds to float: {bounds}")
             continue
 
     # Add bin for values above maximum
-    histogram_data[(data_max, float("inf"))] = 0
+    histogram_data[format_histogram_bin_key(data_max, float("inf"))] = 0
 
     return histogram_data
 
@@ -277,15 +324,9 @@ def create_histogram(
 
     try:
         if is_categorical:
-            output = cast(
-                "dict[HistogramKey, int]",
-                _create_categorical_histogram(data),
-            )
+            output = _create_categorical_histogram(data)
         else:
-            output = cast(
-                "dict[HistogramKey, int]",
-                _create_numerical_histogram(data, bin_calculator),
-            )
+            output = _create_numerical_histogram(data, bin_calculator)
     except Exception:
         logger.exception("Failed to create histogram")
         return None

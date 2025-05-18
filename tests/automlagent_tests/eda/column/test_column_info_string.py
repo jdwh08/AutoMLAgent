@@ -33,6 +33,7 @@ from automlagent.eda.column.column_info_string import (
 )
 from automlagent.eda.column.column_utils import MAX_CATEGORIES_FOR_LEVEL
 from automlagent.types.core import HistogramKey
+from automlagent.utils.histogram_utils import format_histogram_bin_key
 
 
 #####################################################
@@ -125,7 +126,11 @@ class TestColumnInfoString:
 
     def test_numerical_histogram_section_valid(self) -> None:
         # Create a histogram with tuple keys for numerical bins
-        histogram = {(1.0, 2.0): 5, (2.0, 3.0): 10, (3.0, 4.0): 15}
+        histogram = {
+            format_histogram_bin_key(1.0, 2.0): 5,
+            format_histogram_bin_key(2.0, 3.0): 10,
+            format_histogram_bin_key(3.0, 4.0): 15,
+        }
         ci = ColumnInfo(
             name="col",
             histogram=histogram,
@@ -133,9 +138,9 @@ class TestColumnInfoString:
         result = _info_string_numerical_histogram_section(ci)
         assert "Distribution (Histogram)" in result
         assert "| Bin Range | Count |" in result
-        assert "1.00 to 2.00" in result
-        assert "2.00 to 3.00" in result
-        assert "3.00 to 4.00" in result
+        assert "1.0000000000 to 2.0000000000" in result
+        assert "2.0000000000 to 3.0000000000" in result
+        assert "3.0000000000 to 4.0000000000" in result
 
     @pytest.mark.parametrize(
         "histogram",
@@ -225,7 +230,10 @@ class TestColumnInfoString:
         if is_categorical:
             ci.histogram = {"a": 1, "b": 2}
         if is_numeric:
-            ci.histogram = {(0.0, 1.0): 1, (1.0, 2.0): 1}
+            ci.histogram = {
+                format_histogram_bin_key(0.0, 1.0): 1,
+                format_histogram_bin_key(1.0, 2.0): 1,
+            }
             ci.min = 0.0
             ci.max = 1.0
             ci.mean = 0.5

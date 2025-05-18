@@ -22,7 +22,7 @@ def sample_df() -> pl.DataFrame:
 
 @pytest.fixture
 def sample_column_info() -> ColumnInfo:
-    """Create a sample ColumnInfo object."""
+    """Create a sample column info for testing."""
     return ColumnInfo(
         name="numeric",
         type=ColumnType.FLOAT,
@@ -39,7 +39,7 @@ class TestColumnHistogram:
         assert result is not None
         assert "histogram" in result
         histogram = result["histogram"]
-        assert all(isinstance(k, tuple) for k in histogram)
+        assert all(k.startswith("[") and k.endswith("]") for k in histogram)
         assert all(isinstance(v, int) for v in histogram.values())
 
     def test_get_histogram_for_column_categorical(
@@ -74,7 +74,7 @@ class TestColumnHistogram:
         assert result is not None
         assert "histogram" in result
         histogram = result["histogram"]
-        assert all(isinstance(k, tuple) for k in histogram)
+        assert all(k.startswith("[") and k.endswith("]") for k in histogram)
         assert all(isinstance(v, int) for v in histogram.values())
 
     def test_get_histogram_for_column_invalid_column(
@@ -95,7 +95,7 @@ class TestColumnHistogram:
         assert result is not None
         assert "histogram" in result
         histogram = result["histogram"]
-        assert all(isinstance(k, tuple) for k in histogram)
+        assert all(k.startswith("[") and k.endswith("]") for k in histogram)
         assert all(isinstance(v, int) for v in histogram.values())
 
     def test_get_histogram_for_column_edge_bins(self, sample_df: pl.DataFrame) -> None:
@@ -105,9 +105,9 @@ class TestColumnHistogram:
         histogram = result["histogram"]
 
         # Check for -inf bin
-        inf_bins = [k for k in histogram if k[0] == float("-inf")]
+        inf_bins = [k for k in histogram if k.startswith("[-inf")]
         assert len(inf_bins) == 1
 
         # Check for +inf bin
-        inf_bins = [k for k in histogram if k[1] == float("inf")]
+        inf_bins = [k for k in histogram if k.endswith(",inf]")]
         assert len(inf_bins) == 1
