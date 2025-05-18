@@ -1,5 +1,5 @@
 #####################################################
-# AutoMLAgent [EDA COLUMN QUALITY]
+# AutoMLAgent [EDA DATAFRAME STATS]
 #####################################################
 # Jonathan Wang
 
@@ -32,8 +32,10 @@ from automlagent.eda.column.column_stats import (
 ### CODE
 
 
-@mlflow.trace(name="get_numerical_stats", span_type="func")
-def get_numerical_stats(df: pl.DataFrame, df_info: DataFrameInfo) -> DataFrameInfo:
+@mlflow.trace(name="get_numerical_stats_for_df", span_type="func")
+def get_numerical_stats_for_df(
+    df: pl.DataFrame, df_info: DataFrameInfo
+) -> DataFrameInfo:
     """Generate numerical statistics for all numeric columns in a dataframe.
 
     Args:
@@ -56,8 +58,8 @@ def get_numerical_stats(df: pl.DataFrame, df_info: DataFrameInfo) -> DataFrameIn
     return df_info
 
 
-@mlflow.trace(name="get_string_stats", span_type="func")
-def get_string_stats(df: pl.DataFrame, df_info: DataFrameInfo) -> DataFrameInfo:
+@mlflow.trace(name="get_string_stats_for_df", span_type="func")
+def get_string_stats_for_df(df: pl.DataFrame, df_info: DataFrameInfo) -> DataFrameInfo:
     """Generate string statistics for all string columns in a dataframe.
 
     Args:
@@ -78,8 +80,10 @@ def get_string_stats(df: pl.DataFrame, df_info: DataFrameInfo) -> DataFrameInfo:
     return df_info
 
 
-@mlflow.trace(name="get_temporal_stats", span_type="func")
-def get_temporal_stats(df: pl.DataFrame, df_info: DataFrameInfo) -> DataFrameInfo:
+@mlflow.trace(name="get_temporal_stats_for_df", span_type="func")
+def get_temporal_stats_for_df(
+    df: pl.DataFrame, df_info: DataFrameInfo
+) -> DataFrameInfo:
     """Generate temporal statistics for all temporal columns in a dataframe.
 
     Args:

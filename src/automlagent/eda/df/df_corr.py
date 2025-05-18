@@ -28,8 +28,10 @@ from automlagent.logger.mlflow_logger import get_mlflow_logger
 
 #####################################################
 ### CODE
-@mlflow.trace(name="get_pearson_correlation", span_type="func")
-def get_pearson_correlation(df: pl.DataFrame, df_info: DataFrameInfo) -> DataFrameInfo:
+@mlflow.trace(name="get_pearson_correlation_for_df", span_type="func")
+def get_pearson_correlation_for_df(
+    df: pl.DataFrame, df_info: DataFrameInfo
+) -> DataFrameInfo:
     """Compute Pearson correlation for numeric columns.
 
     Args:
@@ -79,8 +81,10 @@ def get_pearson_correlation(df: pl.DataFrame, df_info: DataFrameInfo) -> DataFra
     return df_info
 
 
-@mlflow.trace(name="get_correlation", span_type="func")
-def get_correlation(col_1: str, col_2: str, df_info: DataFrameInfo) -> float | None:
+@mlflow.trace(name="get_correlation_for_df", span_type="func")
+def get_correlation_for_df(
+    col_1: str, col_2: str, df_info: DataFrameInfo
+) -> float | None:
     """Get the correlation between two columns in the dataframe."""
     logger = get_mlflow_logger()
     if df_info.correlation_pearson is None:

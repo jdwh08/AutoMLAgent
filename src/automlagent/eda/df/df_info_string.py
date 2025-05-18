@@ -91,7 +91,7 @@ def _info_string_missing_section(df_info: DataFrameInfo) -> str:
     return "\n".join(lines)
 
 
-def _info_string_duplicates_section(df_info: DataFrameInfo) -> str:
+def _info_string_duplicates_section(df_info: DataFrameInfo) -> str:  # noqa: ARG001
     """Summarize duplicate rows (stub; not available in DataFrameInfo).
 
     Args:
@@ -187,7 +187,8 @@ def _info_string_cardinality_section(df_info: DataFrameInfo) -> str:
     lines: list[str] = []
     if high_card_cols:
         lines.append(
-            f"Columns with high cardinality (>{HIGH_CARDINALITY}): {', '.join(high_card_cols)}."
+            f"Columns with high cardinality (>{HIGH_CARDINALITY}):"
+            f" {', '.join(high_card_cols)}."
         )
     if constant_cols:
         lines.append(
@@ -196,7 +197,7 @@ def _info_string_cardinality_section(df_info: DataFrameInfo) -> str:
     return "\n".join(lines)
 
 
-def _info_string_outlier_section(df_info: DataFrameInfo) -> str:
+def _info_string_outlier_section(df_info: DataFrameInfo) -> str:  # noqa: ARG001
     """Summarize outlier findings (stub; not available in DataFrameInfo).
 
     Args:
@@ -210,7 +211,7 @@ def _info_string_outlier_section(df_info: DataFrameInfo) -> str:
     return ""  # TODO(jdwh08): Add outlier summary if available
 
 
-def generate_info_string_for_df(df_info: DataFrameInfo) -> str:
+def get_info_string_for_df(df_info: DataFrameInfo) -> str:
     """Generate a comprehensive EDA summary string for the DataFrame.
 
     Args:

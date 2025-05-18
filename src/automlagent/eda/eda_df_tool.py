@@ -12,39 +12,57 @@
 ### IMPORTS
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from typing import TypeAlias
 
 import polars as pl
+from pydantic import BaseModel, Field
 
 ### OWN MODULES
 from automlagent.dataclass.df_info import DataFrameInfo
-from automlagent.eda.df.df_corr import get_pearson_correlation
-from automlagent.eda.df.df_quality import get_data_quality, get_missing_values
+from automlagent.eda.df.df_corr import get_pearson_correlation_for_df
+from automlagent.eda.df.df_histogram import get_histogram_for_df
+from automlagent.eda.df.df_quality import (
+    get_data_quality_for_df,
+    get_missing_values_for_df,
+)
 from automlagent.eda.df.df_stats import (
-    get_category_levels,
-    get_histogram_bins,
-    get_numerical_stats,
-    get_string_stats,
-    get_temporal_stats,
+    get_numerical_stats_for_df,
+    get_string_stats_for_df,
+    get_temporal_stats_for_df,
 )
 from automlagent.eda.df.df_types import get_column_types
 from automlagent.logger.mlflow_logger import get_mlflow_logger
 
+#####################################################
+### SETTINGS CLASSES
+
+
+class QualityAnalysisSettings(BaseModel):
+    outlier_zscore_threshold: float = Field(default=3.0, ge=0.0)
+    low_variance_threshold: float = Field(default=0.01, ge=0.0, le=1.0)
+
+
+class DataFrameAnalysisSettings(BaseModel):
+    quality: QualityAnalysisSettings = Field(default_factory=QualityAnalysisSettings)
+
 
 #####################################################
-### DATACLASSES
-@dataclass
-class DataFrameAnalysisSettings:
-    outlier_zscore_threshold: float = 3.0
-    low_variance_threshold: float = 0.01
+### TYPE ALIASES
 
+PredicateFunc: TypeAlias = Callable[[pl.DataFrame, DataFrameInfo], bool]
+HandlerFunc: TypeAlias = Callable[
+    [pl.DataFrame, DataFrameInfo, DataFrameAnalysisSettings], DataFrameInfo
+]
+HandlerPair: TypeAlias = tuple[PredicateFunc, HandlerFunc]
 
 #####################################################
 ### HANDLER FUNCTIONS
 
 
 def analyze_types_handler(
-    df: pl.DataFrame, df_info: DataFrameInfo, settings: DataFrameAnalysisSettings
+    df: pl.DataFrame,
+    df_info: DataFrameInfo,
+    settings: DataFrameAnalysisSettings,  # noqa: ARG001
 ) -> DataFrameInfo:
     logger = get_mlflow_logger()
     try:
@@ -59,11 +77,11 @@ def analyze_quality_handler(
 ) -> DataFrameInfo:
     logger = get_mlflow_logger()
     try:
-        return get_data_quality(
+        return get_data_quality_for_df(
             df,
             df_info,
-            outlier_zscore_threshold=settings.outlier_zscore_threshold,
-            low_variance_threshold=settings.low_variance_threshold,
+            outlier_zscore_threshold=settings.quality.outlier_zscore_threshold,
+            low_variance_threshold=settings.quality.low_variance_threshold,
         )
     except Exception:
         logger.exception("Failed to compute data quality.")
@@ -71,77 +89,78 @@ def analyze_quality_handler(
 
 
 def analyze_missing_handler(
-    df: pl.DataFrame, df_info: DataFrameInfo, settings: DataFrameAnalysisSettings
+    df: pl.DataFrame,
+    df_info: DataFrameInfo,
+    settings: DataFrameAnalysisSettings,  # noqa: ARG001
 ) -> DataFrameInfo:
     logger = get_mlflow_logger()
     try:
-        return get_missing_values(df, df_info)
+        return get_missing_values_for_df(df, df_info)
     except Exception:
         logger.exception("Failed to compute missing values.")
         return df_info
 
 
 def analyze_numerical_stats_handler(
-    df: pl.DataFrame, df_info: DataFrameInfo, settings: DataFrameAnalysisSettings
+    df: pl.DataFrame,
+    df_info: DataFrameInfo,
+    settings: DataFrameAnalysisSettings,  # noqa: ARG001
 ) -> DataFrameInfo:
     logger = get_mlflow_logger()
     try:
-        return get_numerical_stats(df, df_info)
+        return get_numerical_stats_for_df(df, df_info)
     except Exception:
         logger.exception("Failed to compute numerical stats.")
         return df_info
 
 
 def analyze_string_stats_handler(
-    df: pl.DataFrame, df_info: DataFrameInfo, settings: DataFrameAnalysisSettings
+    df: pl.DataFrame,
+    df_info: DataFrameInfo,
+    settings: DataFrameAnalysisSettings,  # noqa: ARG001
 ) -> DataFrameInfo:
     logger = get_mlflow_logger()
     try:
-        return get_string_stats(df, df_info)
+        return get_string_stats_for_df(df, df_info)
     except Exception:
         logger.exception("Failed to compute string stats.")
         return df_info
 
 
-def analyze_category_levels_handler(
-    df: pl.DataFrame, df_info: DataFrameInfo, settings: DataFrameAnalysisSettings
-) -> DataFrameInfo:
-    logger = get_mlflow_logger()
-    try:
-        return get_category_levels(df, df_info)
-    except Exception:
-        logger.exception("Failed to compute category levels.")
-        return df_info
-
-
 def analyze_histogram_bins_handler(
-    df: pl.DataFrame, df_info: DataFrameInfo, settings: DataFrameAnalysisSettings
+    df: pl.DataFrame,
+    df_info: DataFrameInfo,
+    settings: DataFrameAnalysisSettings,  # noqa: ARG001
 ) -> DataFrameInfo:
     logger = get_mlflow_logger()
     try:
-        return get_histogram_bins(df, df_info)
+        return get_histogram_for_df(df, df_info)
     except Exception:
         logger.exception("Failed to compute histogram bins.")
         return df_info
 
 
 def analyze_temporal_stats_handler(
-    df: pl.DataFrame, df_info: DataFrameInfo, settings: DataFrameAnalysisSettings
+    df: pl.DataFrame,
+    df_info: DataFrameInfo,
+    settings: DataFrameAnalysisSettings,  # noqa: ARG001
 ) -> DataFrameInfo:
     logger = get_mlflow_logger()
     try:
-        return get_temporal_stats(df, df_info)
+        return get_temporal_stats_for_df(df, df_info)
     except Exception:
         logger.exception("Failed to compute temporal stats.")
         return df_info
 
 
 def analyze_correlation_handler(
-    df: pl.DataFrame, df_info: DataFrameInfo, settings: DataFrameAnalysisSettings
+    df: pl.DataFrame,
+    df_info: DataFrameInfo,
+    settings: DataFrameAnalysisSettings,  # noqa: ARG001
 ) -> DataFrameInfo:
     logger = get_mlflow_logger()
     try:
-        return get_pearson_correlation(df, df_info)
+        return get_pearson_correlation_for_df(df, df_info)
     except Exception:
         logger.exception("Failed to compute Pearson correlation.")
         return df_info
@@ -151,55 +170,49 @@ def analyze_correlation_handler(
 ### PREDICATE FUNCTIONS
 
 
-def types_missing_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:
+def types_missing_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:  # noqa: ARG001
     return any(
         getattr(col, "type", None) is None or getattr(col, "type", None) == "UNKNOWN"
         for col in getattr(df_info, "column_info", [])
     )
 
 
-def quality_missing_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:
+def quality_missing_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:  # noqa: ARG001
     return True  # Always run quality analysis (safe default)
 
 
-def missing_values_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:
+def missing_values_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:  # noqa: ARG001
     return True  # Always run missing values analysis (safe default)
 
 
-def numerical_stats_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:
+def numerical_stats_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:  # noqa: ARG001
     return any(
         getattr(col, "is_numeric", False) for col in getattr(df_info, "column_info", [])
     )
 
 
-def string_stats_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:
+def string_stats_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:  # noqa: ARG001
     return any(
         getattr(col, "type", None) == "TEXT"
         for col in getattr(df_info, "column_info", [])
     )
 
 
-def category_levels_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:
+def histogram_bins_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:  # noqa: ARG001
     return any(
-        getattr(col, "is_categorical", False)
+        getattr(col, "is_numeric", False) or getattr(col, "is_categorical", False)
         for col in getattr(df_info, "column_info", [])
     )
 
 
-def histogram_bins_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:
-    return any(
-        getattr(col, "is_numeric", False) for col in getattr(df_info, "column_info", [])
-    )
-
-
-def temporal_stats_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:
+def temporal_stats_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:  # noqa: ARG001
     return any(
         getattr(col, "is_temporal", False)
         for col in getattr(df_info, "column_info", [])
     )
 
 
-def correlation_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:
+def correlation_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:  # noqa: ARG001
     numeric_cols = [
         col
         for col in getattr(df_info, "column_info", [])
@@ -212,14 +225,7 @@ def correlation_predicate(df: pl.DataFrame, df_info: DataFrameInfo) -> bool:
 ### HANDLER SEQUENCE FACTORY
 
 
-def create_analyze_dataframe_handlers() -> Sequence[
-    tuple[
-        Callable[[pl.DataFrame, DataFrameInfo], bool],
-        Callable[
-            [pl.DataFrame, DataFrameInfo, DataFrameAnalysisSettings], DataFrameInfo
-        ],
-    ]
-]:
+def create_analyze_dataframe_handlers() -> Sequence[HandlerPair]:
     """Create (predicate, handler) pairs for DataFrame EDA."""
     return [
         (types_missing_predicate, analyze_types_handler),
@@ -227,7 +233,6 @@ def create_analyze_dataframe_handlers() -> Sequence[
         (missing_values_predicate, analyze_missing_handler),
         (numerical_stats_predicate, analyze_numerical_stats_handler),
         (string_stats_predicate, analyze_string_stats_handler),
-        (category_levels_predicate, analyze_category_levels_handler),
         (histogram_bins_predicate, analyze_histogram_bins_handler),
         (temporal_stats_predicate, analyze_temporal_stats_handler),
         (correlation_predicate, analyze_correlation_handler),

@@ -30,7 +30,7 @@ from automlagent.eda.column.column_quality import (
 #####################################################
 ### CODE
 @mlflow.trace(name="get_data_quality", span_type="func")
-def get_data_quality(
+def get_data_quality_for_df(
     df: pl.DataFrame,
     df_info: DataFrameInfo,
     *,
@@ -75,8 +75,10 @@ def get_data_quality(
     return df_info
 
 
-@mlflow.trace(name="get_missing_values", span_type="func")
-def get_missing_values(df: pl.DataFrame, df_info: DataFrameInfo) -> DataFrameInfo:
+@mlflow.trace(name="get_missing_values_for_df", span_type="func")
+def get_missing_values_for_df(
+    df: pl.DataFrame, df_info: DataFrameInfo
+) -> DataFrameInfo:
     """Analyze missing values for all columns in the dataframe.
 
     This function applies missing value analysis to each column and updates

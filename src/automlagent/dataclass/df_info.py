@@ -152,7 +152,7 @@ def create_df_info(
         feature_vars: The feature variables for the dataset.
 
     Returns:
-        DataFrameInfo: A DataFrameInfo object containing type information for all columns.
+        DataFrameInfo: A DataFrameInfo object with type information for all columns.
 
     """
     # Create feature_vars from target var if none.

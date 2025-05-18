@@ -172,9 +172,7 @@ def test_analyze_column_data_quality(
     assert hasattr(result, "has_low_variation")
 
 
-def test_analyze_column_with_settings(
-    sample_df: pl.DataFrame, sample_column_info: ColumnInfo
-) -> None:
+def test_analyze_column_with_settings(sample_df: pl.DataFrame) -> None:
     """Test the analyze_column function with custom settings."""
     settings = ColumnAnalysisSettings(
         outlier_zscore_threshold=2.0,

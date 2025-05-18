@@ -91,7 +91,7 @@ class TestHistogramUtils:
         """Test histogram creation with custom bin calculator."""
         num_custom_bins = 10
 
-        def custom_bins(data: pl.Series) -> int:
+        def custom_bins(data: pl.Series) -> int:  # noqa: ARG001
             return num_custom_bins
 
         histogram = create_histogram(

@@ -16,7 +16,7 @@ import pytest
 ### OWN MODULES
 from automlagent.dataclass.column_info import ColumnInfo, create_column_info
 from automlagent.dataclass.df_info import DataFrameInfo
-from automlagent.eda.df.df_corr import get_pearson_correlation
+from automlagent.eda.df.df_corr import get_pearson_correlation_for_df
 from automlagent.eda.df.df_info_string import (
     _info_string_cardinality_section,  # type: ignore[reportPrivateUsage, unused-ignore]
     _info_string_correlation_section,  # type: ignore[reportPrivateUsage, unused-ignore]
@@ -25,7 +25,7 @@ from automlagent.eda.df.df_info_string import (
     _info_string_outlier_section,  # type: ignore[reportPrivateUsage, unused-ignore]
     _info_string_shape_section,  # type: ignore[reportPrivateUsage, unused-ignore]
     _info_string_target_section,  # type: ignore[reportPrivateUsage, unused-ignore]
-    generate_info_string_for_df,
+    get_info_string_for_df,
 )
 from automlagent.eda.eda_column_tool import analyze_column
 
@@ -123,7 +123,7 @@ def example_dataframe_info(
         column_info=example_column_infos,
     )
     # Compute correlation using the proper function
-    df_info = get_pearson_correlation(example_polars_df, df_info)
+    df_info = get_pearson_correlation_for_df(example_polars_df, df_info)
     return df_info
 
 
@@ -233,7 +233,7 @@ class TestDfInfoString:
             column_info=infos,
         )
         # Compute correlation using the proper function
-        df_info = get_pearson_correlation(df, df_info)
+        df_info = get_pearson_correlation_for_df(df, df_info)
         result = _info_string_correlation_section(df_info)
         assert "Strongly correlated feature pairs" in result
         assert "int_col & int_col2" in result
@@ -249,10 +249,10 @@ class TestDfInfoString:
         result = _info_string_outlier_section(example_dataframe_info)
         assert result == ""
 
-    def test_generate_info_string_for_df_comprehensive(
+    def test_get_info_string_for_df_comprehensive(
         self, example_dataframe_info: DataFrameInfo
     ) -> None:
-        result = generate_info_string_for_df(example_dataframe_info)
+        result = get_info_string_for_df(example_dataframe_info)
         # Check that all sections are present
         assert (
             f"Rows: {example_dataframe_info.num_rows}, "
