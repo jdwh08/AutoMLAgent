@@ -46,7 +46,7 @@ load_dotenv()
 mlflow.gemini.autolog()  # NOTE(jdwh08): doesn't really work
 mlflow.autolog()  # for modelling tasks
 mlflow.set_experiment("PYDANTIC AGENTS TEST v1 EDA")
-mlflow.config.enable_async_logging()  # type: ignore[syntax, reportPrivateImportUsage] <mlflow docs recommends this>
+mlflow.config.enable_async_logging()
 
 # TODO(jdwh08): update model to more local / open
 model = (
@@ -190,8 +190,8 @@ async def main(
 
         # TODO(jdwh08): update kickoff prompt for full df
         kickoff_prompt: str = (
-            "Help me conduct extensive exploratory data analysis for the target variable "
-            f"of the dataset, called {target_var}."
+            "Help me conduct extensive exploratory data analysis "
+            f"for the target variable of the dataset, called {target_var}."
         )
 
         result = await eda_agent.run(

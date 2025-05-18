@@ -90,7 +90,7 @@ class TestColumnDFInfoUtils:
 
     def test_validate_column_info_missing_inputs(self) -> None:
         """Test validation with missing inputs."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Either column_info or df_info"):
             validate_column_info(column_name="col1")
 
     def test_validate_column_info_both_inputs(
@@ -99,7 +99,7 @@ class TestColumnDFInfoUtils:
         sample_df_info: DataFrameInfo,
     ) -> None:
         """Test validation with both ColumnInfo and DataFrameInfo."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Cannot provide both"):
             validate_column_info(
                 column_name="col1",
                 column_info=sample_column_info,
@@ -112,7 +112,7 @@ class TestColumnDFInfoUtils:
         sample_column_info: ColumnInfo,
     ) -> None:
         """Test validation with invalid column name."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="not found in dataframe"):
             validate_column_info(
                 column_name="nonexistent",
                 data=sample_df,
@@ -125,7 +125,9 @@ class TestColumnDFInfoUtils:
         sample_column_info: ColumnInfo,
     ) -> None:
         """Test validation with mismatched Series name."""
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError, match="Series name col1 does not match column_name wrong_name"
+        ):
             validate_column_info(
                 column_name="wrong_name",
                 data=sample_series,
@@ -138,9 +140,12 @@ class TestColumnDFInfoUtils:
         sample_df_info: DataFrameInfo,
     ) -> None:
         """Test validation with column not in DataFrameInfo."""
-        with pytest.raises(ValueError):
+        sample_df_info = sample_df_info.model_copy(update={"column_info": []})
+        with pytest.raises(
+            ValueError, match="Column info for col1 not found in df_info"
+        ):
             validate_column_info(
-                column_name="nonexistent",
+                column_name="col1",
                 data=sample_df,
                 df_info=sample_df_info,
             )
@@ -148,7 +153,6 @@ class TestColumnDFInfoUtils:
     def test_validate_column_info_name_mismatch(
         self,
         sample_df: pl.DataFrame,
-        sample_column_info: ColumnInfo,
     ) -> None:
         """Test validation with mismatched ColumnInfo name."""
         wrong_info = ColumnInfo(
@@ -158,7 +162,9 @@ class TestColumnDFInfoUtils:
             is_categorical=False,
             is_temporal=False,
         )
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError, match="Column info name wrong_name does not match column_name"
+        ):
             validate_column_info(
                 column_name="col1",
                 data=sample_df,

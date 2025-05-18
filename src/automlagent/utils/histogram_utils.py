@@ -196,7 +196,7 @@ def _create_numerical_histogram(
 
         # Extract numeric values from interval notation
         bounds = category.strip("()[]").split(",")
-        if len(bounds) != 2:
+        if len(bounds) != 2:  # noqa: PLR2004
             continue
 
         try:
