@@ -26,13 +26,6 @@ from automlagent.dataclass.column_type import ColumnType
 #####################################################
 ### SETTINGS
 
-polars_temporal = (
-    pl.datatypes.Datetime
-    | pl.datatypes.Date
-    | pl.datatypes.Duration
-    | pl.datatypes.Time
-)
-
 
 #####################################################
 ### DATACLASSES
@@ -66,6 +59,14 @@ class DataFrameInfo(BaseModel):
         description="Pearson correlation matrix for numerical columns.",
     )
 
+    # Info string
+    description: str = Field(
+        default="",
+        description="Description of dataframe.",
+    )
+    info: str = Field(default="", description="EDA information string.")
+
+    ###################################
     # Helper properties for convenience
     @computed_field
     @property
@@ -88,7 +89,7 @@ class DataFrameInfo(BaseModel):
     @computed_field
     @property
     def int_cols(self) -> list[str]:
-        return [col.name for col in self.column_info if col.type == ColumnType.INTEGER]
+        return [col.name for col in self.column_info if col.type == ColumnType.INT]
 
     @computed_field
     @property
@@ -137,8 +138,8 @@ class DataFrameInfo(BaseModel):
         ]
 
 
-@mlflow.trace(name="create_data_frame_info", span_type="func")
-def create_data_frame_info(
+@mlflow.trace(name="create_df_info", span_type="func")
+def create_df_info(
     df: pl.DataFrame,
     target_var: str,
     feature_vars: list[str] | None = None,

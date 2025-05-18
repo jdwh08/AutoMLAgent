@@ -29,6 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 ### OWN MODULES
 from automlagent.dataclass.column_type import ColumnType
+from automlagent.types.core import HistogramKey
 
 #####################################################
 ### SETTINGS
@@ -50,7 +51,7 @@ class ColumnInfo(BaseModel):
 
     # Type
     type: ColumnType = ColumnType.UNKNOWN
-    is_categorial: bool = False
+    is_categorical: bool = False
     is_numeric: bool = False
     is_temporal: bool = False
 
@@ -75,7 +76,6 @@ class ColumnInfo(BaseModel):
     # Categorical analysis fields
     cardinality: int | None = None
     unique_rate: float | None = None
-    category_counts: dict[str, int] = Field(default_factory=dict)
 
     # Numeric analysis fields
     min: float | None = None
@@ -89,8 +89,15 @@ class ColumnInfo(BaseModel):
     std: float | None = None
     skewness: float | None = None
     kurtosis: float | None = None
-    histogram_bins: list[float] = Field(default_factory=list)
-    histogram_counts: list[int] = Field(default_factory=list)
+
+    # Histogram data (unified for both categorical and numerical columns)
+    histogram: dict[HistogramKey, int] = Field(
+        default_factory=dict,
+        description="Histogram counts.",
+    )
+
+    # Information Theory
+    entropy: float | None = None
 
     # String analysis fields
     char_length_min: int | None = None
@@ -99,6 +106,7 @@ class ColumnInfo(BaseModel):
     char_length_std: float | None = None
 
     # Temporal analysis fields
+    timezone: str | None = None
     temporal_min: datetime.date | datetime.datetime | None = None
     temporal_max: datetime.date | datetime.datetime | None = None
     temporal_diff: datetime.timedelta | None = None

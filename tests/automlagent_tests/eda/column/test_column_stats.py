@@ -17,12 +17,10 @@ from collections.abc import Callable
 import numpy as np  # NOTE(jdwh08): used as double check for polars operations
 import polars as pl
 import pytest
-from scipy.stats import kurtosis, skew
+from scipy.stats import kurtosis, skew  # type: ignore[import-untyped]
 
 ### OWN MODULES
 from automlagent.eda.column.column_stats import (
-    get_category_levels_for_column,
-    get_histogram_bins_for_column,
     get_numerical_stats_for_column,
     get_string_stats_for_column,
     get_temporal_stats_for_column,
@@ -33,45 +31,6 @@ from automlagent.eda.column.column_stats import (
 
 
 class TestColumnStats:
-    def test_get_histogram_bins_for_column_expected(self) -> None:
-        """Test histogram bin calculation for a simple numeric column."""
-        df = pl.DataFrame({"a": [1, 2, 3, 4, 5]})
-        result = get_histogram_bins_for_column(df, "a")
-        assert result is not None
-        assert "bin_edges" in result
-        assert "counts" in result
-        assert len(result["bin_edges"]) == len(result["counts"]) + 1
-
-    def test_get_histogram_bins_for_column_non_numeric(self) -> None:
-        """Test that a TypeError is raised when column is not numeric."""
-        df = pl.DataFrame({"a": ["x", "y", "z"]})
-        with pytest.raises(TypeError):
-            get_histogram_bins_for_column(df, "a")
-
-    def test_get_histogram_bins_for_column_missing_column(self) -> None:
-        """Test that a KeyError is raised when column does not exist."""
-        df = pl.DataFrame({"a": [1, 2, 3]})
-        with pytest.raises(KeyError):
-            get_histogram_bins_for_column(df, "b")
-
-    def test_get_histogram_bins_for_column_empty(self) -> None:
-        """Test that None is returned for empty DataFrame."""
-        df = pl.DataFrame({"a": []}, schema=[("a", pl.Int64)])
-        result = get_histogram_bins_for_column(df, "a")
-        assert result == {"bin_edges": [], "counts": []}
-
-    def test_get_category_levels_for_column_expected(self) -> None:
-        """Test category level counts for a string column."""
-        df = pl.DataFrame({"cat": ["a", "b", "a", "c", "b", "a"]})
-        result = get_category_levels_for_column(df, "cat")
-        assert result == {"a": 3, "b": 2, "c": 1}
-
-    def test_get_category_levels_for_column_empty(self) -> None:
-        """Test category levels on empty DataFrame returns empty dict."""
-        df = pl.DataFrame({"cat": []})
-        result = get_category_levels_for_column(df, "cat")
-        assert result == {}
-
     def test_get_numerical_stats_for_column_expected(self) -> None:
         """Test numerical stats for a normal numeric column."""
         arr = [1, 2, 3, 4, 5]

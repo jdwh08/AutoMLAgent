@@ -7,10 +7,9 @@
 - Handle table-level EDA such as correlations, tests, and feature relationships
 
 - Feature Correlation
-  - Pearson Correlation (numeric, numeric)
-  - Cramer's V (categorical, categorical)
-  - ANOVA F statistic? (numeric, categorical)
   - Mutual Information
+  - Cramer's V? (categorical, categorical)
+  - ANOVA F statistic? (numeric, categorical)
 
 - DataFrame level EDA
   - VIF? Highly colinear features?

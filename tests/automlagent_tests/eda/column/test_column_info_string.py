@@ -32,6 +32,7 @@ from automlagent.eda.column.column_info_string import (
     generate_info_string_for_column,
 )
 from automlagent.eda.column.column_utils import MAX_CATEGORIES_FOR_LEVEL
+from automlagent.types.core import HistogramKey
 
 
 #####################################################
@@ -50,7 +51,7 @@ class TestColumnInfoString:
     def test_type_section_target(self) -> None:
         ci = ColumnInfo(
             name="col",
-            type=ColumnType.INTEGER,
+            type=ColumnType.INT,
             is_feature_var=False,
             is_target_var=True,
         )
@@ -77,20 +78,20 @@ class TestColumnInfoString:
         assert result == expected
 
     def test_categorical_section_empty(self) -> None:
-        ci = ColumnInfo(name="col", category_counts={}, cardinality=None)
+        ci = ColumnInfo(name="col", histogram={}, cardinality=None)
         result = _info_string_categorial_stats_section(ci)
         assert result == ""
 
     def test_categorical_section_small(self) -> None:
         counts = {"a": 1, "b": 2}
-        ci = ColumnInfo(name="col", category_counts=counts, cardinality=None)
+        ci = ColumnInfo(name="col", histogram=counts, cardinality=None)
         result = _info_string_categorial_stats_section(ci)
         assert "Unique categories #: 2" in result
         assert "Category distribution: {'a': 1, 'b': 2}" in result
 
     def test_categorical_section_large(self) -> None:
         counts = {f"cat{i}": i for i in range(MAX_CATEGORIES_FOR_LEVEL + 1)}
-        ci = ColumnInfo(name="col", category_counts=counts, cardinality=None)
+        ci = ColumnInfo(name="col", histogram=counts, cardinality=None)
         result = _info_string_categorial_stats_section(ci)
         assert f"Unique categories #: {MAX_CATEGORIES_FOR_LEVEL + 1}" in result
         assert "Top categories" in result
@@ -123,38 +124,34 @@ class TestColumnInfoString:
         assert result == "Range: 0.0 to 10.0"
 
     def test_numerical_histogram_section_valid(self) -> None:
-        bins = [1.0, 2.0, 3.0]
-        counts = [5, 10, 15]
+        # Create a histogram with tuple keys for numerical bins
+        histogram = {(1.0, 2.0): 5, (2.0, 3.0): 10, (3.0, 4.0): 15}
         ci = ColumnInfo(
             name="col",
-            histogram_bins=bins,
-            histogram_counts=counts,
+            histogram=histogram,
         )
         result = _info_string_numerical_histogram_section(ci)
         assert "Distribution (Histogram)" in result
         assert "| Bin Range | Count |" in result
-        assert "< 1.00" in result
         assert "1.00 to 2.00" in result
         assert "2.00 to 3.00" in result
+        assert "3.00 to 4.00" in result
 
     @pytest.mark.parametrize(
-        ("histogram_bins", "histogram_counts"),
+        "histogram",
         [
-            ([1.0], [1]),
-            ([1.0, 2.0], [1, 4, 1]),
+            {},  # Empty histogram
         ],
     )
     def test_numerical_histogram_section_invalid(
         self,
         *,
-        histogram_bins: list[float],
-        histogram_counts: list[int],
+        histogram: dict[HistogramKey, int],
     ) -> None:
         """Covers exception when histogram data is invalid."""
         ci = ColumnInfo(
             name="col",
-            histogram_bins=histogram_bins,
-            histogram_counts=histogram_counts,
+            histogram=histogram,
         )
         result = _info_string_numerical_histogram_section(ci)
         assert result == ""
@@ -204,7 +201,7 @@ class TestColumnInfoString:
         assert "Time span:" not in info
 
     @pytest.mark.parametrize(
-        ("is_categorial", "is_numeric", "is_temporal", "expected_parts"),
+        ("is_categorical", "is_numeric", "is_temporal", "expected_parts"),
         [
             (True, False, False, ["Unique categories"]),
             (False, True, False, ["Range:", "Mean:"]),
@@ -214,22 +211,21 @@ class TestColumnInfoString:
     def test_generate_info_string_for_column(
         self,
         *,
-        is_categorial: bool,
+        is_categorical: bool,
         is_numeric: bool,
         is_temporal: bool,
         expected_parts: list[str],
     ) -> None:
         ci = ColumnInfo(
             name="col",
-            is_categorial=is_categorial,
+            is_categorical=is_categorical,
             is_numeric=is_numeric,
             is_temporal=is_temporal,
         )
-        if is_categorial:
-            ci.category_counts = {"a": 1, "b": 2}
+        if is_categorical:
+            ci.histogram = {"a": 1, "b": 2}
         if is_numeric:
-            ci.histogram_bins = [0.0, 1.0]
-            ci.histogram_counts = [1, 1]
+            ci.histogram = {(0.0, 1.0): 1, (1.0, 2.0): 1}
             ci.min = 0.0
             ci.max = 1.0
             ci.mean = 0.5

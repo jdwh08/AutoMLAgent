@@ -4,7 +4,7 @@ from enum import Enum
 class ColumnType(str, Enum):
     """Enumeration of column data types."""
 
-    INTEGER = "integer"
+    INT = "integer"
     FLOAT = "float"
     BOOLEAN = "boolean"
     STRING = "string"

@@ -24,19 +24,18 @@ import mlflow
 import polars as pl
 import polars.selectors as cs
 
-from automlagent.eda.column.column_utils import column_filter_out_missing
-
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 ### OWN MODULES
 from automlagent.dataclass.column_info import ColumnInfo
 from automlagent.dataclass.column_type import ColumnType
+from automlagent.eda.column.column_utils import column_filter_out_missing
 from automlagent.logger.mlflow_logger import get_mlflow_logger
 
 #####################################################
 ### SETTINGS
-LOW_VARIATION_THRESHOLD = 0.05  # x% not majority class to be low variation
+LOW_VARIATION_THRESHOLD = 0.2  # x% not majority class to be low variation
 
 ColumnDataQualityMetrics: TypeAlias = dict[str, int | float | bool]
 
@@ -82,7 +81,7 @@ def column_data_quality_missing_inf(
 def column_data_quality_missing_check(
     df: pl.DataFrame,
     column_name: str,
-    column_info: ColumnInfo | None = None,
+    column_info: ColumnInfo,
 ) -> ColumnDataQualityMetrics:
     """Analyze data quality for a column with missing values.
 
@@ -102,8 +101,6 @@ def column_data_quality_missing_check(
 
     # Check if all nulls
     result: ColumnDataQualityMetrics = {}
-    if column_info is None:
-        column_info = ColumnInfo(name=column_name)
 
     if column_info.missing_rate is None:
         column_info = column_info.model_copy(
@@ -121,11 +118,55 @@ def column_data_quality_missing_check(
     return result
 
 
+@mlflow.trace(name="column_data_quality_boolean", span_type="func")
+def column_data_quality_boolean_handler(
+    df: pl.DataFrame,
+    column_name: str,
+    column_info: ColumnInfo,
+) -> ColumnDataQualityMetrics:
+    """Analyze data quality for a boolean column.
+
+    Args:
+        df: The input dataframe
+        column_name: Name of the column to analyze
+        column_info: Optional ColumnInfo object
+
+    Returns:
+        ColumnDataQualityMetrics: dict with data quality metrics
+
+    """
+    result: ColumnDataQualityMetrics = column_data_quality_missing_check(
+        df, column_name, column_info
+    )
+    if result != {}:
+        return result
+
+    try:
+        # For boolean columns, we only need to check for low variation
+        # A boolean column has low variation if one value dominates
+        value_counts = df.select(
+            pl.col(column_name).value_counts(sort=True, name="counts")
+        ).unnest(column_name)
+
+        if value_counts.height > 0:
+            max_count = value_counts.select(pl.col("counts").max()).item()
+            has_low_variation = (max_count / df.height) > (1 - LOW_VARIATION_THRESHOLD)
+            result["has_low_variation"] = has_low_variation
+
+        # Boolean columns don't have outliers in the traditional sense
+        result["outlier_count"] = 0
+        result["outlier_rate"] = 0.0
+    except Exception:
+        logger = get_mlflow_logger()
+        logger.exception(f"Error analyzing quality for boolean column {column_name}")
+    return result
+
+
 @mlflow.trace(name="column_data_quality_numeric", span_type="func")
 def column_data_quality_numeric(
     df: pl.DataFrame,
     column_name: str,
-    column_info: ColumnInfo | None = None,
+    column_info: ColumnInfo,
     outlier_zscore_threshold: float = 3.0,
     low_variance_threshold: float = 0.01,
 ) -> ColumnDataQualityMetrics:
@@ -149,14 +190,18 @@ def column_data_quality_numeric(
         return result
 
     def _get_mean_and_std(
-        col: pl.Series, column_info: ColumnInfo | None = None
+        col: pl.Series, column_info: ColumnInfo
     ) -> tuple[float, float]:
-        if column_info is not None:
-            raw_mean = column_info.mean if column_info.mean is not None else col.mean()
-            raw_std = column_info.std if column_info.std is not None else col.std()
-        else:
-            raw_mean = col.mean()
-            raw_std = col.std()
+        raw_mean = (
+            column_info.mean
+            if column_info.mean is not None
+            else col.drop_nans().drop_nulls().mean()
+        )
+        raw_std = (
+            column_info.std
+            if column_info.std is not None
+            else col.drop_nans().drop_nulls().std()
+        )
 
         if raw_mean is None or raw_std is None:
             # NOTE(jdwh08): mean of not-computable column is none.
@@ -165,8 +210,8 @@ def column_data_quality_numeric(
             raise ValueError(msg)
 
         try:
-            mean = float(raw_mean)
-            std = float(raw_std)
+            mean = float(raw_mean)  # type: ignore[arg-type] # NOTE(jdwh08): polars sucks for typing
+            std = float(raw_std)  # type: ignore[arg-type]
         except (TypeError, ValueError) as e:
             msg = (
                 "Mean or std is not convertible to float: "
@@ -200,7 +245,7 @@ def column_data_quality_numeric(
 def column_data_quality_categorical_handler(
     df: pl.DataFrame,
     column_name: str,
-    column_info: ColumnInfo | None = None,
+    column_info: ColumnInfo,
 ) -> ColumnDataQualityMetrics:
     """Analyze data quality for a categorical column (CATEGORICAL, TEXT).
 
@@ -221,9 +266,13 @@ def column_data_quality_categorical_handler(
 
     try:
         top_count = None
-        if column_info is not None and getattr(column_info, "category_counts", None):
-            category_counts = column_info.category_counts
-            top_count = max(category_counts.values()) if category_counts else None
+        # Get categorical histogram data
+        categorical_histogram = {
+            k: v for k, v in column_info.histogram.items() if isinstance(k, str)
+        }
+
+        if categorical_histogram:
+            top_count = max(categorical_histogram.values())
         else:
             value_counts = df.select(
                 pl.col(column_name).value_counts(sort=True, name="counts")
@@ -248,7 +297,7 @@ def column_data_quality_categorical_handler(
 def column_data_quality_temporal_handler(
     df: pl.DataFrame,
     column_name: str,
-    column_info: ColumnInfo | None = None,
+    column_info: ColumnInfo,
 ) -> ColumnDataQualityMetrics:
     """Analyze data quality for a temporal column (DATETIME, DATE, TIME).
 
@@ -271,8 +320,9 @@ def column_data_quality_temporal_handler(
     def _raise_conversion_error(msg: str) -> None:
         raise ValueError(msg)
 
+    time_series: pl.Series = df[column_name]
+
     try:
-        time_series: pl.Series = df[column_name]
         time_series_float = (
             time_series.cast(pl.Int128)
             if time_series.dtype == pl.Date
@@ -291,16 +341,25 @@ def column_data_quality_temporal_handler(
         iqr: float = q3 - q1  # type: ignore[operator]
         lower_bound: float = floor(q1 - 1.5 * iqr)  # type: ignore[operator]
         upper_bound: float = ceil(q3 + 1.5 * iqr)  # type: ignore[operator]
+
         lower_bound_dt = (
-            pl.from_epoch([int(lower_bound)], time_unit="d")[0]
+            pl.from_epoch([int(lower_bound)], time_unit="d")
             if time_series.dtype == pl.Date
-            else pl.from_epoch([int(lower_bound)], time_unit="ms")[0]
+            else pl.from_epoch([int(lower_bound)], time_unit="ms")
         )
+        if lower_bound_dt.dtype == pl.Datetime:
+            lower_bound_dt = lower_bound_dt.dt.replace_time_zone(column_info.timezone)
+        lower_bound_dt = lower_bound_dt[0]
+
         upper_bound_dt = (
-            pl.from_epoch([int(upper_bound)], time_unit="d")[0]
+            pl.from_epoch([int(upper_bound)], time_unit="d")
             if time_series.dtype == pl.Date
-            else pl.from_epoch([int(upper_bound)], time_unit="ms")[0]
+            else pl.from_epoch([int(upper_bound)], time_unit="ms")
         )
+        if upper_bound_dt.dtype == pl.Datetime:
+            upper_bound_dt = upper_bound_dt.dt.replace_time_zone(column_info.timezone)
+        upper_bound_dt = upper_bound_dt[0]
+
         outliers = df.filter(
             (pl.col(column_name) < lower_bound_dt)
             | (pl.col(column_name) > upper_bound_dt)
@@ -308,6 +367,7 @@ def column_data_quality_temporal_handler(
         outlier_count = outliers.height
         result["outlier_count"] = outlier_count
         result["outlier_rate"] = outlier_count / df.height if df.height > 0 else 0.0
+        # TODO(jdwh08): Improve "low variation" method for temporal
         # Low variation for temporal: all values same or nearly same
         unique_count = df[column_name].n_unique()
         result["has_low_variation"] = unique_count <= 1
@@ -321,7 +381,7 @@ def column_data_quality_temporal_handler(
 def get_data_quality_for_column(
     df: pl.DataFrame,
     column_name: str,
-    column_info: ColumnInfo | None = None,
+    column_info: ColumnInfo,
     outlier_zscore_threshold: float = 3.0,
     low_variance_threshold: float = 0.01,
 ) -> ColumnDataQualityMetrics:
@@ -364,13 +424,14 @@ def get_data_quality_for_column(
         ColumnType,
         Callable[[pl.DataFrame, str, ColumnInfo | None], ColumnDataQualityMetrics],
     ] = {
-        ColumnType.INTEGER: column_data_quality_numeric_handler,
+        ColumnType.INT: column_data_quality_numeric_handler,
         ColumnType.FLOAT: column_data_quality_numeric_handler,
         ColumnType.CATEGORICAL: column_data_quality_categorical_handler,
         ColumnType.TEXT: column_data_quality_categorical_handler,
         ColumnType.DATETIME: column_data_quality_temporal_handler,
         ColumnType.DATE: column_data_quality_temporal_handler,
         ColumnType.TIME: column_data_quality_temporal_handler,
+        ColumnType.BOOLEAN: column_data_quality_boolean_handler,
     }
 
     handler = strategy_map.get(col_type)
