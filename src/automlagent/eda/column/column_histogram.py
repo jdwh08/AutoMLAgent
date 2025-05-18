@@ -22,8 +22,8 @@ import polars as pl
 ### OWN MODULES
 from automlagent.dataclass.column_info import ColumnInfo
 from automlagent.logger.mlflow_logger import get_mlflow_logger
+from automlagent.types.core import HistogramKey
 from automlagent.utils.histogram_utils import (
-    HistogramKey,
     create_histogram,
 )
 

@@ -5,6 +5,7 @@
 ^archive/
 mlruns/
 papers/
+junit/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
