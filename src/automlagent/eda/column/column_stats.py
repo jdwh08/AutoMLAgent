@@ -17,17 +17,16 @@
 
 from __future__ import annotations
 
-import datetime
+from typing import TYPE_CHECKING
 
 import mlflow
 import polars as pl
 
 ### OWN MODULES
-from automlagent.eda.column.column_utils import (
-    MAX_CATEGORIES_FOR_LEVEL,
-    column_filter_out_missing,
-)
-from automlagent.logger.mlflow_logger import get_mlflow_logger
+from automlagent.eda.column.column_utils import column_filter_out_missing
+
+if TYPE_CHECKING:
+    import datetime
 
 #####################################################
 ### SETTINGS
@@ -35,144 +34,6 @@ from automlagent.logger.mlflow_logger import get_mlflow_logger
 
 #####################################################
 ### CODE
-@mlflow.trace(name="get_histogram_bins_for_column", span_type="func")
-def get_histogram_bins_for_column(
-    df: pl.DataFrame, column_name: str
-) -> dict[str, list[float] | list[int]] | None:
-    """Create a histogram for a numeric variable in a dataframe.
-
-    Args:
-        df (pl.DataFrame): The dataframe to analyze.
-        column_name (str): The column to analyze.
-
-    Returns:
-        dict[str, list[float] | list[int]]: The bin edges
-            and the count of rows in each bin.
-            If failed to create, dictionary is empty.
-
-    """
-    logger = get_mlflow_logger()
-
-    output: dict[str, list[float] | list[int]] = {}
-    histogram_bins: list[float] = []
-    histogram_counts: list[int] = []
-
-    if column_name not in df.columns:
-        msg = f"Column '{column_name}' not found in DataFrame."
-        raise KeyError(msg)
-    if not df[column_name].dtype.is_numeric():
-        msg = f"Column '{column_name}' must be numeric."
-        raise TypeError(msg)
-    if df.select(pl.col(column_name)).is_empty():
-        return {
-            "bin_edges": histogram_bins,
-            "counts": histogram_counts,
-        }
-
-    try:
-        histogram = (
-            df.select(pl.col(column_name).hist(include_category=True))
-            .unnest(column_name)
-            .sort("category")
-        )
-        if (
-            histogram is None or len(histogram) <= 0
-        ):  # pragma: no cover  # defensive typing polars return
-            msg = f"Failed to create histogram for {column_name}."
-            logger.warning(msg, stacklevel=2)
-            return None
-
-        # Convert interval strings to numeric bin edges
-        # Sort to ensure we process bins in order
-        for row in histogram.rows():
-            category, count = row
-
-            # Extract numeric values from interval notation
-            # Format is typically "(lower, upper]" or "[lower, upper]"
-            if not category or not isinstance(category, str):
-                msg = f"Failed to parse bin for {column_name}: {category}"
-                logger.warning(msg, stacklevel=2)
-                continue
-
-            # Strip brackets and split by comma
-            expected_num_bounds = 2
-            bounds = category.strip("()[]").split(",")
-            if (
-                len(bounds) != expected_num_bounds
-            ):  # pragma: no cover  # defensive polars output format return
-                msg = f"Failed to parse bin for {column_name}: {category}"
-                logger.warning(msg, stacklevel=2)
-                continue
-
-            try:
-                lower = float(bounds[0].strip())
-                upper = float(bounds[1].strip())
-                # For first bin, add the lower edge
-                if not histogram_bins:
-                    histogram_bins.append(lower)
-
-                # Always add the upper edge
-                histogram_bins.append(upper)
-                histogram_counts.append(count)
-            except (
-                ValueError
-            ):  # pragma: no cover  # defensive polars output format parsing
-                logger.exception(f"Failed to parse bin for {column_name}")
-                continue
-
-        # Only store if we successfully parsed bins
-        if (
-            histogram_bins
-            and histogram_counts
-            and len(histogram_bins) == len(histogram_counts) + 1
-        ):
-            output = {"bin_edges": histogram_bins, "counts": histogram_counts}
-            return output
-
-        # pragma: no cover  # defensive polars output format parsing
-        logger.exception(f"Failed to create histogram for {column_name}")
-    except Exception:
-        logger.exception(f"Failed to create histogram for {column_name}")
-    return None
-
-
-@mlflow.trace(name="get_category_levels_for_column", span_type="func")
-def get_category_levels_for_column(
-    df: pl.DataFrame, column_name: str
-) -> dict[str, int]:
-    """Create a histogram for a numeric variable in a dataframe.
-
-    Args:
-        df (pl.DataFrame): The dataframe to analyze.
-        column_name (str): The column to analyze.
-
-    Returns:
-        dict[str, int]: The category levels and their counts.
-            If failed to create, dictionary is empty.
-
-    """
-    category_counts: dict[str, int] = {}
-    try:
-        value_counts = df.select(
-            pl.col(column_name).value_counts(sort=True, name="counts")
-        )
-
-        # Build category counts dictionary
-        if len(value_counts) > 0:
-            # Convert to dict, limiting to reasonable number
-            for row_idx, row in enumerate(value_counts.rows()):
-                if row_idx >= MAX_CATEGORIES_FOR_LEVEL:
-                    break
-                row_dict = row[0]
-                value = row_dict.get(f"{column_name}")
-                count = row_dict.get("counts")
-                category_counts[str(value)] = count
-    except Exception:
-        logger = get_mlflow_logger()
-        logger.exception(f"Failed to create histogram for {column_name}")
-    return category_counts
-
-
 @mlflow.trace(name="get_numerical_stats_for_column", span_type="func")
 def get_numerical_stats_for_column(
     df: pl.DataFrame, column_name: str
@@ -194,8 +55,19 @@ def get_numerical_stats_for_column(
         "max": df_filtered.select(pl.col(column_name).max()).item(),
         "mean": df_filtered.select(pl.col(column_name).mean()).item(),
         "median": df_filtered.select(pl.col(column_name).median()).item(),
-        "q1": df_filtered.select(pl.col(column_name).quantile(0.25)).item(),
-        "q3": df_filtered.select(pl.col(column_name).quantile(0.75)).item(),
+        # NOTE(jdwh08): "linear" approximates values like NumPy
+        "p5": df_filtered.select(
+            pl.col(column_name).quantile(0.05, interpolation="linear")
+        ).item(),
+        "q1": df_filtered.select(
+            pl.col(column_name).quantile(0.25, interpolation="linear")
+        ).item(),
+        "q3": df_filtered.select(
+            pl.col(column_name).quantile(0.75, interpolation="linear")
+        ).item(),
+        "p95": df_filtered.select(
+            pl.col(column_name).quantile(0.95, interpolation="linear")
+        ).item(),
         "std": df_filtered.select(pl.col(column_name).std()).item(),
         "skewness": df_filtered.select(pl.col(column_name).skew()).item(),
         "kurtosis": df_filtered.select(pl.col(column_name).kurtosis()).item(),

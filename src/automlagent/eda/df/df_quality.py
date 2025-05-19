@@ -1,5 +1,5 @@
 #####################################################
-# AutoMLAgent [EDA COLUMN QUALITY]
+# AutoMLAgent [EDA DATAFRAME QUALITY]
 #####################################################
 # Jonathan Wang
 
@@ -21,13 +21,16 @@ import polars as pl
 ### OWN MODULES
 from automlagent.dataclass.column_info import ColumnInfo
 from automlagent.dataclass.df_info import DataFrameInfo
-from automlagent.eda.column.column_quality import get_data_quality_for_column
+from automlagent.eda.column.column_quality import (
+    column_data_quality_missing_inf,
+    get_data_quality_for_column,
+)
 
 
 #####################################################
 ### CODE
 @mlflow.trace(name="get_data_quality", span_type="func")
-def get_data_quality(
+def get_data_quality_for_df(
     df: pl.DataFrame,
     df_info: DataFrameInfo,
     *,
@@ -51,6 +54,11 @@ def get_data_quality(
 
     """
     column_infos: list[ColumnInfo] = df_info.column_info
+
+    if len(column_infos) <= 0 and df.shape[1] > 0:
+        msg = "DataFrameInfo does not have any column infos. Please create them first."
+        raise ValueError(msg)
+
     column_infos = [
         column_info.model_copy(
             update=get_data_quality_for_column(
@@ -63,13 +71,18 @@ def get_data_quality(
         )
         for column_info in column_infos
     ]
-    df_info.column_info = column_infos
+    df_info = df_info.model_copy(update={"column_info": column_infos})
     return df_info
 
 
-@mlflow.trace(name="get_missing_values", span_type="func")
-def get_missing_values(df: pl.DataFrame, df_info: DataFrameInfo) -> DataFrameInfo:
-    """Generate a markdown table of missing value rates.
+@mlflow.trace(name="get_missing_values_for_df", span_type="func")
+def get_missing_values_for_df(
+    df: pl.DataFrame, df_info: DataFrameInfo
+) -> DataFrameInfo:
+    """Analyze missing values for all columns in the dataframe.
+
+    This function applies missing value analysis to each column and updates
+    the DataFrameInfo object with the results.
 
     Args:
         df: DataFrame containing the data
@@ -79,20 +92,25 @@ def get_missing_values(df: pl.DataFrame, df_info: DataFrameInfo) -> DataFrameInf
         DataFrameInfo: Comprehensive type information for all columns
 
     """
-    total_rows = len(df)
-    missing_df = df.null_count()
-    for column_info in df_info.column_info:
-        column_name = column_info.name
-        if column_name in missing_df:
-            column_info.missing_count = missing_df.item(
-                row=0,
-                column=column_name,
+    column_infos: list[ColumnInfo] = df_info.column_info
+
+    if len(column_infos) <= 0 and df.shape[1] > 0:
+        msg = "DataFrameInfo does not have any column infos. Please create them first."
+        raise ValueError(msg)
+
+    column_infos = [
+        column_info.model_copy(
+            update=column_data_quality_missing_inf(
+                df,
+                column_info.name,
             )
-            column_info.missing_rate = (column_info.missing_count or 0) / total_rows
+        )
+        for column_info in column_infos
+    ]
+    df_info = df_info.model_copy(update={"column_info": column_infos})
     return df_info
 
 
-@mlflow.trace(name="analyze_missing_values", span_type="func")
 def analyze_missing_values(df_info: DataFrameInfo) -> str:
     """Generate a markdown table summarizing missing value rates for all columns.
 

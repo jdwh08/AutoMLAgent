@@ -1,5 +1,5 @@
 #####################################################
-# AutoMLAgent [EDA DATAFRAME TYPES]
+# AutoMLAgent [EDA DATAFRAME HISTOGRAM]
 #####################################################
 # Jonathan Wang
 
@@ -7,45 +7,47 @@
 # This process is a POC for automating
 # the modelling process.
 
-"""Column-level type inference tools across dataframe for EDA."""
+"""Column-level stats across dataframe for EDA."""
 
 #####################################################
 ### BOARD
 
 #####################################################
 ### IMPORTS
+
 import mlflow
 import polars as pl
 
 ### OWN MODULES
 from automlagent.dataclass.column_info import ColumnInfo
 from automlagent.dataclass.df_info import DataFrameInfo
-from automlagent.eda.column.column_types import get_type_for_column
-
+from automlagent.eda.column.column_histogram import get_histogram_for_column
 
 #####################################################
 ### CODE
-@mlflow.trace(name="get_column_types", span_type="func")
-def get_column_types(df: pl.DataFrame, df_info: DataFrameInfo) -> DataFrameInfo:
-    """Extract column type information for columns in a dataframe.
+
+
+@mlflow.trace(name="get_histogram_for_df", span_type="func")
+def get_histogram_for_df(df: pl.DataFrame, df_info: DataFrameInfo) -> DataFrameInfo:
+    """Generate histogram for all relevant columns in a dataframe.
 
     Args:
-        df: The dataframe to get the column type from.
-        df_info: A DataFrameInfo object with at least the name populated.
-            Other fields may be pre-populated and will be preserved unless overridden.
+        df (pl.DataFrame): DataFrame containing the data
+        df_info (DataFrameInfo): DataFrame type information
 
     Returns:
-        DataFrameInfo: updated DataFrameInfo object with column type info.
+        DataFrameInfo: DataFrame type information with histogram
 
     """
     column_infos: list[ColumnInfo] = df_info.column_info
     column_infos = [
         column_info.model_copy(
-            update=get_type_for_column(
-                df, column_name=column_info.name, column_info=column_info
+            update=get_histogram_for_column(
+                df, column_info.name, column_info=column_info
             )
         )
         for column_info in column_infos
+        if column_info.is_numeric or column_info.is_categorical
     ]
     df_info.column_info = column_infos
     return df_info

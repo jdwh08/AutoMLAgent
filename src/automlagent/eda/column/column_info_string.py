@@ -24,7 +24,6 @@ import mlflow
 ### OWN MODULES
 from automlagent.dataclass.column_info import ColumnInfo
 from automlagent.eda.column.column_utils import MAX_CATEGORIES_FOR_LEVEL
-from automlagent.logger.mlflow_logger import get_mlflow_logger
 
 #####################################################
 ### SETTINGS
@@ -63,10 +62,13 @@ def _info_string_missing_values_section(column_info: ColumnInfo) -> str:
 
 def _info_string_categorial_stats_section(column_info: ColumnInfo) -> str:
     """Add categorial stats info."""
+    # Get categorical histogram data
+    categorical_histogram = {
+        k: v for k, v in column_info.histogram.items() if isinstance(k, str)
+    }
+
     num_categories = (
-        len(column_info.category_counts)
-        if column_info.category_counts
-        else column_info.cardinality
+        len(categorical_histogram) if categorical_histogram else column_info.cardinality
     )
     output: str = ""
 
@@ -76,15 +78,13 @@ def _info_string_categorial_stats_section(column_info: ColumnInfo) -> str:
     output += f"Unique categories #: {num_categories}\n"
 
     if num_categories < MAX_CATEGORIES_FOR_LEVEL:
-        output += f"Category distribution: {column_info.category_counts}"
+        output += f"Category distribution: {categorical_histogram}"
     else:
         # Show top categories only
-        top_cats = dict(
-            list(column_info.category_counts.items())[:MAX_CATEGORIES_FOR_LEVEL]
-        )
+        top_cats = dict(list(categorical_histogram.items())[:MAX_CATEGORIES_FOR_LEVEL])
         output += f"Top categories: {top_cats} ...\n"
         output += (
-            f"and {len(column_info.category_counts) - MAX_CATEGORIES_FOR_LEVEL} "
+            f"and {len(categorical_histogram) - MAX_CATEGORIES_FOR_LEVEL} "
             "more categories"  # NOTE(jdwh08): we use this for categories omitted check
         )
 
@@ -122,15 +122,14 @@ def _info_string_numerical_histogram_section(column_info: ColumnInfo) -> str:
     # Format the histogram as text
     output_strings: list[str] = []
 
-    # Add each bin and its count
-    bins = column_info.histogram_bins
-    counts = column_info.histogram_counts
+    # Get numerical histogram data
+    numerical_histogram = {
+        k: v
+        for k, v in column_info.histogram.items()
+        if k.startswith("[") and k.endswith("]")
+    }
 
-    if not bins or not counts:
-        return ""
-    if len(bins) <= 1 or len(bins) != len(counts):
-        logger = get_mlflow_logger()
-        logger.warning("Invalid histogram data")
+    if not numerical_histogram:
         return ""
 
     output_strings.append("\n**Distribution (Histogram):**\n")
@@ -139,11 +138,23 @@ def _info_string_numerical_histogram_section(column_info: ColumnInfo) -> str:
     output_strings.append("| Bin Range | Count |")
     output_strings.append("|-----------|-------|")
 
-    histogram_texts: list[str] = [
-        (f"< {bins[i]:.2f}" if i == 0 else f"{bins[i - 1]:.2f} to {bins[i]:.2f}")
-        for i in range(len(counts))
-    ]
-    output_strings = [*output_strings, *histogram_texts]
+    # Sort by bin start value
+    sorted_bins = sorted(
+        numerical_histogram.items(),
+        key=lambda x: float("-inf")
+        if x[0].startswith("[-inf")
+        else float(x[0].strip("[]").split(",")[0]),
+    )
+
+    for bin_key, count in sorted_bins:
+        # Parse the bin key
+        bounds = bin_key.strip("[]").split(",")
+        bin_start = bounds[0]
+        bin_end = bounds[1]
+
+        # Format the range for display
+        bin_range = f"{bin_start} to {bin_end}"
+        output_strings.append(f"| {bin_range} | {count} |")
 
     output = "\n".join(output_strings)
     return output
@@ -199,7 +210,7 @@ def generate_info_string_for_column(
 
     # Type-specific info
     displayed_all_categories_flag: bool = False
-    if column_info.is_categorial:
+    if column_info.is_categorical:
         info_parts.append(_info_string_categorial_stats_section(column_info))
         displayed_all_categories_flag = info_parts[-1].endswith("more categories")
 
@@ -207,11 +218,12 @@ def generate_info_string_for_column(
         # Add numeric stats
         info_parts.append(_info_string_numerical_stats_section(column_info))
 
-        if (
-            len(column_info.histogram_bins) > 0
-            and len(column_info.histogram_counts) > 0
-            and not displayed_all_categories_flag
-        ):
+        # Check if we have numerical histogram data
+        has_numerical_histogram = any(
+            isinstance(k, tuple) for k in column_info.histogram
+        )
+
+        if has_numerical_histogram and not displayed_all_categories_flag:
             # NOTE(jdwh08): If categorical, we use the categories.
             info_parts.append(_info_string_numerical_histogram_section(column_info))
 

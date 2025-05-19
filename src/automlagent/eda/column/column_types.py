@@ -42,11 +42,79 @@ from automlagent.logger.mlflow_logger import get_mlflow_logger
 #####################################################
 ### SETTINGS
 
-ColumnTypeDict: TypeAlias = dict[str, ColumnType | bool | int]
+# NOTE(jdwh08): Only used here.
+# ColumnType is internal enum for column type.
+# bool is for boolean fields like is_categorical, is_numeric, is_temporal
+# int and float are for numeric fields like cardinality
+# str is for string fields like timezone
+# None is for fields that may not exist like timezone
+ColumnTypeDict: TypeAlias = dict[str, ColumnType | bool | int | float | str | None]
 
 
 #####################################################
 ### CODE
+def _get_cardinality(
+    df: pl.DataFrame, column_name: str, input_dict: ColumnTypeDict
+) -> ColumnTypeDict:
+    """Get the cardinality of a column in a dataframe.
+
+    Args:
+        df (pl.DataFrame): The dataframe to get the cardinality from.
+        column_name (str): The name of the column to get the cardinality for.
+        input_dict (dict[str, object]): The input dictionary containing column info.
+
+    Returns:
+        dict[str, object]: We add cardinality info to the input dictionary.
+
+    """
+    cardinality: int = 99999  # NOTE(jdwh08): default very high (non-categorical)
+    output = input_dict.copy()
+    try:
+        cardinality = df[column_name].n_unique()
+    except Exception:
+        logger = get_mlflow_logger()
+        logger.exception(f"Failed to calculate cardinality for {column_name}")
+        cardinality = len(df)  # assume worse case
+    output["cardinality"] = cardinality
+    output["unique_rate"] = cardinality / len(df) if len(df) > 0 else 0
+    return output
+
+
+def _get_timezone(
+    df: pl.DataFrame, column_name: str, input_dict: ColumnTypeDict
+) -> ColumnTypeDict:
+    """Get the timezone of a datetime column in a dataframe.
+
+    Args:
+        df (pl.DataFrame): The dataframe to get the timezone from.
+        column_name (str): The name of the column to get the timezone for.
+        input_dict (dict[str, object]): The input dictionary containing column info.
+
+    Returns:
+        dict[str, object]: We add timezone info to the input dictionary.
+
+    """
+    output = input_dict.copy()
+    # Get timezone if it exists on the dtype
+    if column_name not in df.columns:
+        msg = f"Column {column_name} not found in dataframe"
+        raise ValueError(msg)
+
+    time_series = df[column_name]
+    timezone = getattr(time_series.dtype, "time_zone", None)
+    if not (timezone is None or isinstance(timezone, str)):
+        msg = (
+            f"Timezone for column {column_name} is {timezone}"
+            f" a {type(timezone)!s} not string or None."
+        )
+        logger = get_mlflow_logger()
+        logger.error(msg)
+        raise TypeError(msg)
+
+    output["timezone"] = timezone
+    return output
+
+
 def initialize_output_dict(
     df: pl.DataFrame, column_name: str, column_info: ColumnInfo | None
 ) -> ColumnTypeDict:
@@ -54,20 +122,12 @@ def initialize_output_dict(
     output: ColumnTypeDict = {}
 
     # Calculate cardinality if not already known
-    cardinality: int = 99999  # NOTE(jdwh08): default very high (non-categorical)
     if column_info is None or column_info.cardinality is None:
-        try:
-            cardinality = df[column_name].n_unique()
-            output["cardinality"] = cardinality
-        except Exception:
-            logger = get_mlflow_logger()
-            logger.exception(f"Failed to calculate cardinality for {column_name}")
-            cardinality = len(df)  # assume worse case
-            output["cardinality"] = cardinality
+        output = _get_cardinality(df, column_name, output)
 
     # Initialize type attributes
     output["type"] = ColumnType.UNKNOWN
-    output["is_categorial"] = False
+    output["is_categorical"] = False
     output["is_numeric"] = False
     output["is_temporal"] = False
 
@@ -99,35 +159,45 @@ def create_column_type_handlers(
     cardinality_threshold = max(cardinality_threshold, DEFAULT_CATEGORICAL_THRESHOLD)
 
     # Define handlers for each type
-    def handle_boolean(output: ColumnTypeDict) -> None:
+    def handle_boolean(output: ColumnTypeDict) -> ColumnTypeDict:
         output["type"] = ColumnType.BOOLEAN
-        output["is_categorial"] = True
+        output["is_categorical"] = True
+        return output
 
-    def handle_integer(output: ColumnTypeDict) -> None:
-        output["type"] = ColumnType.INTEGER
+    def handle_integer(output: ColumnTypeDict) -> ColumnTypeDict:
+        output["type"] = ColumnType.INT
         output["is_numeric"] = True
-        output["is_categorial"] = cardinality <= cardinality_threshold
+        output["is_categorical"] = cardinality <= cardinality_threshold
+        return output
 
-    def handle_float(output: ColumnTypeDict) -> None:
+    def handle_float(output: ColumnTypeDict) -> ColumnTypeDict:
         output["type"] = ColumnType.FLOAT
         output["is_numeric"] = True
-        output["is_categorial"] = cardinality <= cardinality_threshold
+        output["is_categorical"] = cardinality <= cardinality_threshold
+        return output
 
-    def handle_datetime(output: ColumnTypeDict) -> None:
+    def handle_datetime(output: ColumnTypeDict) -> ColumnTypeDict:
         output["type"] = ColumnType.DATETIME
         output["is_temporal"] = True
+        output = _get_timezone(df, column_name, output)
+        return output
 
-    def handle_date(output: ColumnTypeDict) -> None:
+    def handle_date(output: ColumnTypeDict) -> ColumnTypeDict:
         output["type"] = ColumnType.DATE
         output["is_temporal"] = True
+        output = _get_timezone(df, column_name, output)
+        return output
 
-    def handle_time(output: ColumnTypeDict) -> None:
+    def handle_time(output: ColumnTypeDict) -> ColumnTypeDict:
         output["type"] = ColumnType.TIME
         output["is_temporal"] = True
+        output = _get_timezone(df, column_name, output)
+        return output
 
-    def handle_string(output: ColumnTypeDict) -> None:
+    def handle_string(output: ColumnTypeDict) -> ColumnTypeDict:
         output["type"] = ColumnType.TEXT
-        output["is_categorial"] = cardinality <= cardinality_threshold
+        output["is_categorical"] = cardinality <= cardinality_threshold
+        return output
 
     # Return ordered list of (predicate, handler) pairs
     # NOTE(jdwh08): predicate checks if handler applies, apply first handler that does
@@ -170,7 +240,7 @@ def get_type_for_column(
     column_name: str,
     *,
     column_info: ColumnInfo | None = None,
-) -> dict[str, ColumnType | bool | int]:
+) -> ColumnTypeDict:
     """Get the type of a column in a dataframe.
 
     Args:
@@ -184,18 +254,20 @@ def get_type_for_column(
 
     """
     logger = get_mlflow_logger()
-    output: dict[str, ColumnType | bool | int] = {}
+    output: ColumnTypeDict = {}
 
     # Calculate cardinality if not already known
-    cardinality: int = 99999
     if column_info is None or column_info.cardinality is None:
-        try:
-            cardinality = df[column_name].n_unique()
-            output["cardinality"] = cardinality
-        except Exception:
-            logger.exception(f"Failed to calculate cardinality for {column_name}")
-            cardinality = df.shape[0]  # assume worse case
-            output["cardinality"] = cardinality
+        output = _get_cardinality(df, column_name, output)
+    else:
+        output["cardinality"] = column_info.cardinality
+        output["unique_rate"] = column_info.cardinality / df.height
+    cardinality = output["cardinality"]
+
+    if not isinstance(cardinality, int):  # pragma: no coverage <for type checker>
+        msg = f"Expected integer cardinality, got {type(cardinality)}"
+        logger.error(msg)
+        raise TypeError(msg)
 
     # Calculate cardinality threshold based on dataset size
     cardinality_threshold = min(
@@ -205,15 +277,15 @@ def get_type_for_column(
 
     # Initialize type attributes
     output["type"] = ColumnType.UNKNOWN
-    output["is_categorial"] = False
+    output["is_categorical"] = False
     output["is_numeric"] = False
     output["is_temporal"] = False
 
-    try:
-        # Check if column exists
-        if column_name not in df.columns:
-            return output
+    # Check if column exists
+    if column_name not in df.columns:
+        return output
 
+    try:
         # Get handlers
         type_handlers = create_column_type_handlers(
             df=df, column_name=column_name, cardinality=cardinality
@@ -221,7 +293,7 @@ def get_type_for_column(
         # Apply handlers
         for predicate, handler in type_handlers:
             if predicate():
-                handler(output)
+                output = handler(output)
                 return output
 
     except Exception:

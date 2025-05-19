@@ -1,14 +1,29 @@
+# CI for AutoMLAgent
+# - Tests on Python 3.11, 3.12, 3.13
+# - Caches .venv per OS/Python/deps
+# - Warns on type/lint errors (does not fail)
+# - Uploads coverage to Codecov
+# - Maintained by jdwh08, see TODOs for update reminders
+
 name: CI
+
+permissions:
+  contents: read  # restrict token scope
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]  # run check on push
   pull_request:
-    branches: [main]
+    branches: [main, dev]  # run check on pull request
 
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [3.11, 3.12, 3.13]  # TODO(jdwh08): keep this updated
+      fail-fast: false  # run all jobs even if one fails
 
     steps:
     - uses: actions/checkout@v4
@@ -16,12 +31,21 @@ jobs:
     - name: Install uv
       uses: astral-sh/setup-uv@v5
       with:
-        version: "0.6.14"
+        version: "0.6.14"  # TODO(jdwh08): keep this updated
 
     - name: "Set up Python"
       uses: actions/setup-python@v5
       with:
         python-version-file: "pyproject.toml"
+
+    - name: Cache Python venv
+      uses: actions/cache@v4
+      with:
+        path: .venv
+        # Cache .venv packages for each os/version/pyproj.toml combination
+        key: venv-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+        restore-keys: |
+          venv-${{ runner.os }}-py${{ matrix.python-version }}-
 
     - name: Install dependencies
       run: |
@@ -42,26 +66,27 @@ jobs:
     - name: Debug Print sys.path
       run: python -c "import sys; print('\n'.join(sys.path))"
 
-    # - name: Type check with mypy
-    #   run: uv run mypy src/
+    - name: Type check with mypy. Warn only.
+      run: uv run mypy src/ || true  # Log and warn only since return true
 
-    # - name: Lint code with Ruff
-    #   run: uv run ruff check --output-format=github --target-version=py311
+    - name: Lint code with Ruff. Warn only.
+      run: uv run ruff check --output-format=github || true
 
     - name: Check code formatting
-      run: uv run ruff format --check --diff --target-version=py311
+      run: uv run ruff format --check --diff
 
     - name: Test with pytest
-      run: uv run pytest --junitxml=junit/test-results.xml --cov=src --cov-report=xml --cov-report=html
+      run: uv run pytest --import-mode=importlib --junitxml=junit/test-results.xml --cov=src --cov-report=xml --cov-report=html
 
     - name: Upload JUnit test results
       uses: actions/upload-artifact@v4
       with:
-        name: junit-results
+        name: junit-results-${{ matrix.python-version }}
         path: junit/test-results.xml
 
     - name: Update coverage to Codecov
       uses: codecov/codecov-action@v4
       with:
         files: ./coverage.xml
+        flags: py${{ matrix.python-version }}
         fail_ci_if_error: true

@@ -26,13 +26,6 @@ from automlagent.dataclass.column_type import ColumnType
 #####################################################
 ### SETTINGS
 
-polars_temporal = (
-    pl.datatypes.Datetime
-    | pl.datatypes.Date
-    | pl.datatypes.Duration
-    | pl.datatypes.Time
-)
-
 
 #####################################################
 ### DATACLASSES
@@ -48,8 +41,6 @@ class DataFrameInfo(BaseModel):
     num_cols: int
 
     # Data Quality
-    has_duplicate_rows: bool = False
-
     @computed_field
     @property
     def missing_value_cols(self) -> list[str]:
@@ -63,8 +54,19 @@ class DataFrameInfo(BaseModel):
     column_info: list[ColumnInfo] = Field(default_factory=list)
 
     # Correlation matrix
-    correlation_matrix: pl.DataFrame | None = None
+    correlation_pearson: pl.DataFrame | None = Field(
+        default=None,
+        description="Pearson correlation matrix for numerical columns.",
+    )
 
+    # Info string
+    description: str = Field(
+        default="",
+        description="Description of dataframe.",
+    )
+    info: str = Field(default="", description="EDA information string.")
+
+    ###################################
     # Helper properties for convenience
     @computed_field
     @property
@@ -87,7 +89,7 @@ class DataFrameInfo(BaseModel):
     @computed_field
     @property
     def int_cols(self) -> list[str]:
-        return [col.name for col in self.column_info if col.type == ColumnType.INTEGER]
+        return [col.name for col in self.column_info if col.type == ColumnType.INT]
 
     @computed_field
     @property
@@ -136,8 +138,8 @@ class DataFrameInfo(BaseModel):
         ]
 
 
-@mlflow.trace(name="create_data_frame_info", span_type="func")
-def create_data_frame_info(
+@mlflow.trace(name="create_df_info", span_type="func")
+def create_df_info(
     df: pl.DataFrame,
     target_var: str,
     feature_vars: list[str] | None = None,
@@ -150,7 +152,7 @@ def create_data_frame_info(
         feature_vars: The feature variables for the dataset.
 
     Returns:
-        DataFrameInfo: A DataFrameInfo object containing type information for all columns.
+        DataFrameInfo: A DataFrameInfo object with type information for all columns.
 
     """
     # Create feature_vars from target var if none.

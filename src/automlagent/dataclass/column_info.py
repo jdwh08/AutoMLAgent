@@ -12,6 +12,12 @@
 #####################################################
 ### BOARD
 
+# TODO(jdwh08): Add Zeros / Zero_Rate?
+# TODO(jdwh08): Add Coefficient of Variation?
+# TODO(jdwh08): Add Q-Q against Normal Distribution?
+
+# TODO(jdwh08): Add graphs for KDE / Q-Q?
+
 #####################################################
 ### IMPORTS
 
@@ -23,6 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 ### OWN MODULES
 from automlagent.dataclass.column_type import ColumnType
+from automlagent.types.core import HistogramKey
 
 #####################################################
 ### SETTINGS
@@ -44,7 +51,7 @@ class ColumnInfo(BaseModel):
 
     # Type
     type: ColumnType = ColumnType.UNKNOWN
-    is_categorial: bool = False
+    is_categorical: bool = False
     is_numeric: bool = False
     is_temporal: bool = False
 
@@ -68,20 +75,29 @@ class ColumnInfo(BaseModel):
 
     # Categorical analysis fields
     cardinality: int | None = None
-    category_counts: dict[str, int] = Field(default_factory=dict)
+    unique_rate: float | None = None
 
     # Numeric analysis fields
     min: float | None = None
     max: float | None = None
     mean: float | None = None
     median: float | None = None
+    p5: float | None = None
     q1: float | None = None
     q3: float | None = None
+    p95: float | None = None
     std: float | None = None
     skewness: float | None = None
     kurtosis: float | None = None
-    histogram_bins: list[float] = Field(default_factory=list)
-    histogram_counts: list[int] = Field(default_factory=list)
+
+    # Histogram data (unified for both categorical and numerical columns)
+    histogram: dict[HistogramKey, int] = Field(
+        default_factory=dict,
+        description="Histogram counts.",
+    )
+
+    # Information Theory
+    entropy: float | None = None
 
     # String analysis fields
     char_length_min: int | None = None
@@ -90,6 +106,7 @@ class ColumnInfo(BaseModel):
     char_length_std: float | None = None
 
     # Temporal analysis fields
+    timezone: str | None = None
     temporal_min: datetime.date | datetime.datetime | None = None
     temporal_max: datetime.date | datetime.datetime | None = None
     temporal_diff: datetime.timedelta | None = None

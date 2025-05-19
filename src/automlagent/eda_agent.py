@@ -29,7 +29,9 @@ from pydantic_ai import Agent, RunContext
 
 ### OWN MODULES
 from automlagent.dataclass.column_info import create_column_info
-from automlagent.eda.eda_column_tools import analyze_column
+from automlagent.dataclass.df_info import create_df_info
+from automlagent.eda.eda_column_tool import analyze_column
+from automlagent.eda.eda_df_tool import analyze_dataframe
 from automlagent.logger.mlflow_logger import get_mlflow_logger
 
 #####################################################
@@ -44,7 +46,7 @@ load_dotenv()
 mlflow.gemini.autolog()  # NOTE(jdwh08): doesn't really work
 mlflow.autolog()  # for modelling tasks
 mlflow.set_experiment("PYDANTIC AGENTS TEST v1 EDA")
-mlflow.config.enable_async_logging()  # type: ignore[syntax, reportPrivateImportUsage] <mlflow docs recommends this>
+mlflow.config.enable_async_logging()
 
 # TODO(jdwh08): update model to more local / open
 model = (
@@ -128,6 +130,41 @@ async def eda_column_tool(ctx: RunContext[DfEdaDependencies], column_name: str) 
         return column_info.info
 
 
+@eda_agent.tool
+@mlflow.trace(name="eda_dataframe_tool", span_type="tool")
+async def eda_dataframe_tool(ctx: RunContext[DfEdaDependencies]) -> str:
+    """Conduct exploratory analysis on the entire dataset.
+
+    Args:
+        ctx: Run context with dependencies
+
+    Returns:
+        str: Formatted analysis of the specified column
+
+    """
+    df: pl.DataFrame = ctx.deps.df
+    target_var = ctx.deps.target_var
+    feature_vars = ctx.deps.feature_vars
+
+    # Determine variable type
+    df_info = create_df_info(
+        df,
+        target_var=target_var,
+        feature_vars=feature_vars,
+    )
+
+    try:
+        # Analyze Dataframe
+        df_info = analyze_dataframe(df=df, df_info=df_info)
+    except Exception as e:
+        logger = get_mlflow_logger()
+        logger.exception("Failed to analyze dataframe")
+        return f"Error analyzing dataframe: {e!s}"
+    else:
+        # Return the results
+        return df_info.info
+
+
 @mlflow.trace(name="main", span_type="entry")
 async def main(
     file_path: Path,
@@ -153,8 +190,8 @@ async def main(
 
         # TODO(jdwh08): update kickoff prompt for full df
         kickoff_prompt: str = (
-            "Help me conduct extensive exploratory data analysis for the target variable "
-            f"of the dataset, called {target_var}."
+            "Help me conduct extensive exploratory data analysis "
+            f"for the target variable of the dataset, called {target_var}."
         )
 
         result = await eda_agent.run(

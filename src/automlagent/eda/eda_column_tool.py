@@ -7,7 +7,7 @@
 # This process is a POC for automating
 # the modelling process.
 
-"""EDA Column Tools."""
+"""EDA Column Tool Orchestration."""
 
 #####################################################
 ### BOARD
@@ -25,14 +25,13 @@ import polars as pl
 from automlagent.dataclass.column_info import ColumnInfo
 from automlagent.dataclass.column_type import ColumnType
 from automlagent.dataclass.df_info import DataFrameInfo
+from automlagent.eda.column.column_histogram import get_histogram_for_column
 from automlagent.eda.column.column_info_string import generate_info_string_for_column
 from automlagent.eda.column.column_quality import (
     column_data_quality_missing_inf,
     get_data_quality_for_column,
 )
 from automlagent.eda.column.column_stats import (
-    get_category_levels_for_column,
-    get_histogram_bins_for_column,
     get_numerical_stats_for_column,
     get_temporal_stats_for_column,
 )
@@ -48,12 +47,17 @@ from automlagent.logger.mlflow_logger import get_mlflow_logger
 # NOTE(jdwh08): Default settings for column analysis
 @dataclass
 class ColumnAnalysisSettings:
+    """Settings for column analysis."""
+
     outlier_zscore_threshold: float = 3.0
     low_variance_threshold: float = 0.01
+    default_is_feature_var: bool = (
+        True  # NOTE(jdwh08): assume is feature var as opposed to target
+    )
 
 
 #####################################################
-### CODE
+### HANDLER FUNCTIONS
 
 
 @mlflow.trace(name="analyze_column_unknown_type", span_type="func")
@@ -94,8 +98,11 @@ def analyze_column_numerical_type_handler(
 
     # Get histogram data
     try:
-        histogram_data = get_histogram_bins_for_column(df, column_name)
+        histogram_data = get_histogram_for_column(
+            df, column_name, column_info=column_info
+        )
         if histogram_data:
+            # Update the histogram field with the numerical histogram data
             column_info = column_info.model_copy(update=histogram_data)
     except Exception:
         logger = get_mlflow_logger()
@@ -111,7 +118,10 @@ def analyze_column_categorial_type_handler(
 ) -> ColumnInfo:
     # Get category levels and counts
     try:
-        category_data = get_category_levels_for_column(df, column_name)
+        category_data = get_histogram_for_column(
+            df, column_name, column_info=column_info
+        )
+        # Update the histogram field with the categorical data
         column_info = column_info.model_copy(update=category_data)
     except Exception:
         logger = get_mlflow_logger()
@@ -144,22 +154,52 @@ def analyze_column_data_quality(
     low_variance_threshold: float = 0.01,
 ) -> ColumnInfo:
     try:
-        quality_metrics = get_data_quality_for_column(
+        quality_data = get_data_quality_for_column(
             df,
             column_name,
             column_info=column_info,
             outlier_zscore_threshold=outlier_zscore_threshold,
             low_variance_threshold=low_variance_threshold,
         )
-        column_info = column_info.model_copy(update=quality_metrics)
+        column_info = column_info.model_copy(update=quality_data)
     except Exception:
         logger = get_mlflow_logger()
-        logger.exception(f"Failed to calculate data quality metrics for {column_name}")
+        logger.exception(f"Failed to calculate data quality for {column_name}")
     return column_info
 
 
+#####################################################
+### PREDICATE FUNCTIONS
+
+
+def unknown_type_predicate(column_info: ColumnInfo) -> bool:
+    return getattr(column_info, "type", None) == ColumnType.UNKNOWN
+
+
+def missing_value_predicate(column_info: ColumnInfo) -> bool:
+    return getattr(column_info, "missing_count", None) is None
+
+
+def numerical_type_predicate(column_info: ColumnInfo) -> bool:
+    return getattr(column_info, "is_numeric", False)
+
+
+def categorial_type_predicate(column_info: ColumnInfo) -> bool:
+    return getattr(column_info, "is_categorical", False)
+
+
+def temporal_type_predicate(column_info: ColumnInfo) -> bool:
+    return getattr(column_info, "is_temporal", False)
+
+
+def data_quality_predicate(column_info: ColumnInfo) -> bool:
+    return getattr(column_info, "outlier_count", None) is None
+
+
+#####################################################
+### HANDLER SEQUENCE FACTORY
 def create_analyze_column_handlers(
-    column_info: ColumnInfo,
+    column_info: ColumnInfo,  # noqa: ARG001
     outlier_zscore_threshold: float = 3.0,
     low_variance_threshold: float = 0.01,
 ) -> Sequence[
@@ -168,7 +208,7 @@ def create_analyze_column_handlers(
         Callable[[pl.DataFrame, str, ColumnInfo], ColumnInfo],
     ]
 ]:
-    """Create a sequence of handlers for analyzing columns.
+    """Create a sequence of (predicate, handler) pairs for analyzing columns.
 
     Args:
         column_info: ColumnInfo object to update
@@ -176,7 +216,7 @@ def create_analyze_column_handlers(
         low_variance_threshold: Variance threshold for low variation
 
     Returns:
-        Sequence of handlers for analyzing columns
+        Sequence of (predicate, handler) pairs for analyzing columns
 
     """
 
@@ -194,33 +234,17 @@ def create_analyze_column_handlers(
         )
 
     return [
-        (
-            lambda col_info: col_info.type == ColumnType.UNKNOWN,
-            analyze_column_unknown_type_handler,
-        ),
-        (
-            lambda col_info: col_info.missing_count is None,
-            analyze_column_missing_value_handler,
-        ),
-        (
-            lambda col_info: col_info.is_numeric,
-            analyze_column_numerical_type_handler,
-        ),
-        (
-            lambda col_info: col_info.is_categorial,
-            analyze_column_categorial_type_handler,
-        ),
-        (
-            lambda col_info: col_info.is_temporal,
-            analyze_column_temporal_type_handler,
-        ),
-        (
-            lambda col_info: col_info.outlier_count is None,
-            analyze_column_data_quality_handler,
-        ),
+        (unknown_type_predicate, analyze_column_unknown_type_handler),
+        (missing_value_predicate, analyze_column_missing_value_handler),
+        (numerical_type_predicate, analyze_column_numerical_type_handler),
+        (categorial_type_predicate, analyze_column_categorial_type_handler),
+        (temporal_type_predicate, analyze_column_temporal_type_handler),
+        (data_quality_predicate, analyze_column_data_quality_handler),
     ]
 
 
+#####################################################
+### MAIN ORCHESTRATION FUNCTION
 @mlflow.trace(name="analyze_column", span_type="func")
 def analyze_column(
     df: pl.DataFrame,
@@ -246,33 +270,43 @@ def analyze_column(
         Updated ColumnInfo with comprehensive analysis
 
     """
-    # Validate inputs
     logger = get_mlflow_logger()
+
+    # Validate inputs
+    if column_info is None and df_info is None:
+        msg = "Either column_info or df_info must be provided"
+        logger.exception(msg)
+        raise ValueError(msg)
+
+    if column_info is not None and df_info is not None:
+        msg = "Cannot provide both column_info and df_info"
+        logger.exception(msg)
+        raise ValueError(msg)
+
     if column_name not in df.columns:
         msg = f"Column {column_name} not found in dataframe"
         logger.exception(msg)
         raise ValueError(msg)
 
-    # Get or create column_info
+    # Get column_info from df_info
     if column_info is None and df_info is not None:
         column_info = next(
             (c for c in df_info.column_info if c.name == column_name), None
         )
 
-    if column_info is None:
-        msg = f"Column {column_name} not found in column_info or df_info"
+    if column_info is None:  # NOTE(jdwh08): this is here insetad of nested for typing
+        msg = f"Column info for {column_name} not found in df_info."
         logger.exception(msg)
         raise ValueError(msg)
+
+    # Generate settings if not provided
+    analysis_settings = analysis_settings or ColumnAnalysisSettings()
 
     # Generate warning if column is analyzed already.
     if column_info.is_analyzed:
         msg = f"Column {column_name} has already been analyzed"
         logger.warning(msg)
         return column_info
-
-    # Generate settings if not provided
-    if analysis_settings is None:
-        analysis_settings = ColumnAnalysisSettings()
 
     try:
         handlers = create_analyze_column_handlers(
@@ -281,8 +315,8 @@ def analyze_column(
             analysis_settings.low_variance_threshold,
         )
 
-        for condition, handler in handlers:
-            if condition(column_info):
+        for predicate, handler in handlers:
+            if predicate(column_info):
                 column_info = handler(df, column_name, column_info)
 
         # Generate info summary string based on column type

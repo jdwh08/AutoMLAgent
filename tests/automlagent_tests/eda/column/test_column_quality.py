@@ -21,6 +21,7 @@
 import polars as pl
 import pytest
 
+### OWN MODULES
 from automlagent.dataclass.column_info import ColumnInfo
 from automlagent.dataclass.column_type import ColumnType
 from automlagent.eda.column.column_quality import (
@@ -31,6 +32,7 @@ from automlagent.eda.column.column_quality import (
     column_data_quality_temporal_handler,
     get_data_quality_for_column,
 )
+from automlagent.eda.column.column_types import get_type_for_column
 
 
 #####################################################
@@ -44,8 +46,9 @@ class TestUnitColumnQuality:
         self,
         basic_float_df: pl.DataFrame,
     ) -> None:
+        ci = ColumnInfo(name="col2")
         with pytest.raises(KeyError, match="Column 'col2' not found in DataFrame."):
-            column_data_quality_missing_check(basic_float_df, "col2")
+            column_data_quality_missing_check(basic_float_df, "col2", column_info=ci)
 
     def test_column_all_missing(
         self,
@@ -76,7 +79,8 @@ class TestUnitColumnQuality:
     ) -> None:
         missing_arr = [None, None, None] * 3
         df = pl.DataFrame({"col": missing_arr})
-        res = column_data_quality_missing_check(df, "col")
+        ci = ColumnInfo(name="col")
+        res = column_data_quality_missing_check(df, "col", column_info=ci)
         assert res == {
             "outlier_count": 0,
             "outlier_rate": 0.0,
@@ -86,7 +90,8 @@ class TestUnitColumnQuality:
     def test_numeric_non_numeric_column(self) -> None:
         """Covers fallback/exception path at end of column_data_quality_numeric."""
         df = pl.DataFrame({"col": ["a", "b", "c"]})
-        res = column_data_quality_numeric(df, "col")
+        ci = ColumnInfo(name="col", type=ColumnType.INT)
+        res = column_data_quality_numeric(df, "col", column_info=ci)
         assert res == {}
 
     def test_numeric_get_mean_and_std_none(self) -> None:
@@ -104,9 +109,11 @@ class TestUnitColumnQuality:
     def test_numeric_no_outliers_no_low_variation(
         self, basic_float_df: pl.DataFrame
     ) -> None:
+        ci = ColumnInfo(name="col", type=ColumnType.FLOAT)
         res = column_data_quality_numeric(
             basic_float_df,
             "col",
+            column_info=ci,
             outlier_zscore_threshold=3.0,
             low_variance_threshold=0.01,
         )
@@ -116,15 +123,32 @@ class TestUnitColumnQuality:
 
     def test_numeric_all_nulls_returns_zero_and_low_variation(self) -> None:
         df = pl.DataFrame({"col": [None, None, None]})
-        res = column_data_quality_numeric(df, "col")
+        ci = ColumnInfo(name="col", type=ColumnType.FLOAT)
+        res = column_data_quality_numeric(df, "col", column_info=ci)
         assert res["outlier_count"] == 0
         assert res["outlier_rate"] == 0.0
         assert res["has_low_variation"] is True
 
+    def test_numeric_partial_missing_values(self) -> None:
+        """Test numeric quality analysis with mixed missing values."""
+        df = pl.DataFrame({"col": [1.0, None, 2.0, float("nan"), 3.0, 999.0, None]})
+        ci = ColumnInfo(name="col", type=ColumnType.FLOAT)
+        res = column_data_quality_numeric(df, "col", column_info=ci)
+        # Should detect inf as outlier
+        assert res["outlier_count"] == 1
+        assert pytest.approx(res["outlier_rate"], rel=1e-3) == 1.0 / 7.0
+        # Should not be low variation due to spread of values
+        assert res["has_low_variation"] is False
+
     def test_numeric_custom_thresholds_detect_outlier_and_variation(self) -> None:
         df = pl.DataFrame({"col": [1.0, 1.0, 1.0, 10.0]})
+        ci = ColumnInfo(name="col", type=ColumnType.FLOAT)
         res = column_data_quality_numeric(
-            df, "col", outlier_zscore_threshold=1.0, low_variance_threshold=1.0
+            df,
+            "col",
+            column_info=ci,
+            outlier_zscore_threshold=1.0,
+            low_variance_threshold=1.0,
         )
         # Expect one outlier (10.0)
         assert res["outlier_count"] == 1
@@ -149,32 +173,70 @@ class TestUnitColumnQuality:
 
     def test_categorical_no_info_low_variation_false(self) -> None:
         df = pl.DataFrame({"col": ["a", "b", "c", "a"]})
-        res = column_data_quality_categorical_handler(df, "col")
+        ci = ColumnInfo(name="col", type=ColumnType.CATEGORICAL)
+        res = column_data_quality_categorical_handler(df, "col", column_info=ci)
         assert res["outlier_count"] == 0
         assert res["outlier_rate"] == 0.0
         assert res["has_low_variation"] is False
 
     def test_categorical_uniform_true(self) -> None:
         df = pl.DataFrame({"col": ["x"] * 10})
-        res = column_data_quality_categorical_handler(df, "col")
+        ci = ColumnInfo(name="col", type=ColumnType.CATEGORICAL)
+        res = column_data_quality_categorical_handler(df, "col", column_info=ci)
         assert res["has_low_variation"] is True
         assert res["outlier_count"] == 0
         assert res["outlier_rate"] == 0.0
 
     def test_categorical_with_column_info_override(self) -> None:
         ci = ColumnInfo(name="col")
-        ci.category_counts = {"a": 8, "b": 2}
+        ci.histogram = {"a": 8, "b": 2}
         df = pl.DataFrame({"col": ["a"] * 8 + ["b"] * 2})
         res = column_data_quality_categorical_handler(df, "col", column_info=ci)
         assert res["has_low_variation"] is False
         assert res["outlier_count"] == 0
         assert res["outlier_rate"] == 0.0
 
+    def test_categorical_partial_missing_values(self) -> None:
+        """Test categorical quality analysis with mixed missing values."""
+        col_array = ["a", None, "a", "a", None, "c", "a", "b"] + ["a"] * 50
+        df = pl.DataFrame({"col": col_array})
+        ci = ColumnInfo(name="col", type=ColumnType.CATEGORICAL)
+        res = column_data_quality_categorical_handler(df, "col", column_info=ci)
+        # No outliers in categorical data
+        assert res["outlier_count"] == 0
+        assert res["outlier_rate"] == 0.0
+        # Should be low variation as 'a' is majority
+        assert res["has_low_variation"] is True
+
     def test_temporal_outliers_and_variation(self) -> None:
-        dates = ["2020-01-01", "2020-01-02", "2020-01-03", "2030-01-01"]
+        dates = ["2020-01-01", "2020-01-02", "2020-01-03", "2030-10-10"]
         df = pl.DataFrame({"col": dates})
         df = df.with_columns(pl.col("col").str.to_date().alias("col"))
-        res = column_data_quality_temporal_handler(df, "col")
+        ci = ColumnInfo(name="col")
+        res = column_data_quality_temporal_handler(df, "col", column_info=ci)
+        assert res["outlier_count"] == 1
+        assert pytest.approx(res["outlier_rate"], rel=1e-3) == 1.0 / 4.0
+        assert res["has_low_variation"] is False
+
+    def test_temporal_datetime_with_timezone(self) -> None:
+        """Test temporal quality analysis with timezone-aware datetimes."""
+        dates = [
+            "2020-01-01 12:00:00+00:00",
+            "2020-01-02 12:00:00+00:00",
+            "2020-01-03 12:00:00+00:00",
+            "2030-01-01 12:00:00+00:00",  # Outlier
+        ]
+        df = pl.DataFrame({"col": dates})
+        df = df.with_columns(
+            pl.col("col")
+            .str.to_datetime(time_unit="us", time_zone="Antarctica/Troll")  # :3
+            .alias("col")
+        )
+        ci = ColumnInfo(name="col")
+        ci = ci.model_copy(
+            update=get_type_for_column(df=df, column_name="col", column_info=ci)
+        )
+        res = column_data_quality_temporal_handler(df, "col", column_info=ci)
         assert res["outlier_count"] == 1
         assert pytest.approx(res["outlier_rate"], rel=1e-3) == 1.0 / 4.0
         assert res["has_low_variation"] is False
@@ -183,10 +245,62 @@ class TestUnitColumnQuality:
         dates = ["2021-06-01"] * 5
         df = pl.DataFrame({"col": dates})
         df = df.with_columns(pl.col("col").str.to_date().alias("col"))
-        res = column_data_quality_temporal_handler(df, "col")
+        ci = ColumnInfo(name="col")
+        ci = ci.model_copy(
+            update=get_type_for_column(df=df, column_name="col", column_info=ci)
+        )
+        res = column_data_quality_temporal_handler(df, "col", column_info=ci)
         assert res["outlier_count"] == 0
         assert pytest.approx(res["outlier_rate"], rel=1e-3) == 0.0
         assert res["has_low_variation"] is True
+
+    def test_temporal_partial_missing_values(self) -> None:
+        """Test temporal quality analysis with mixed missing values."""
+        dates = [
+            "2020-01-01",
+            None,
+            "2020-01-02",
+            "2020-01-03",
+            None,
+            "2030-01-01",  # Outlier
+        ]
+        df = pl.DataFrame({"col": dates})
+        df = df.with_columns(pl.col("col").str.to_date().alias("col"))
+        ci = ColumnInfo(name="col", type=ColumnType.DATE)
+        ci = ci.model_copy(
+            update=get_type_for_column(df=df, column_name="col", column_info=ci)
+        )
+        res = column_data_quality_temporal_handler(df, "col", column_info=ci)
+        # Should detect 2030 date as outlier
+        assert res["outlier_count"] == 1
+        assert pytest.approx(res["outlier_rate"], rel=1e-3) == 1.0 / 6.0
+        # Should not be low variation due to spread of dates
+        assert res["has_low_variation"] is False
+
+    def test_temporal_partial_missing_with_timezone(self) -> None:
+        """Test temporal quality analysis with mixed missing values and timezone."""
+        dates = [
+            "2020-01-01 12:00:00+00:00",
+            None,
+            "2020-01-02 12:00:00+00:00",
+            "2020-01-03 12:00:00+00:00",
+            None,
+            "2030-01-01 12:00:00+00:00",  # Outlier
+        ]
+        df = pl.DataFrame({"col": dates})
+        df = df.with_columns(
+            pl.col("col").str.to_datetime(time_unit="us", time_zone="UTC").alias("col")
+        )
+        ci = ColumnInfo(name="col", type=ColumnType.DATETIME)
+        ci = ci.model_copy(
+            update=get_type_for_column(df=df, column_name="col", column_info=ci)
+        )
+        res = column_data_quality_temporal_handler(df, "col", column_info=ci)
+        # Should detect 2030 datetime as outlier
+        assert res["outlier_count"] == 1
+        assert pytest.approx(res["outlier_rate"], rel=1e-3) == 1.0 / 6.0
+        # Should not be low variation due to spread of datetimes
+        assert res["has_low_variation"] is False
 
     def test_dispatch_with_column_info_type(self) -> None:
         """Test to ensure multiple types can work with get_data_quality_for_column."""
@@ -202,7 +316,7 @@ class TestUnitColumnQuality:
             }
         )
         df = df.with_columns(pl.col("dt").str.to_datetime().alias("dt"))
-        ci_num = ColumnInfo(name="num", type=ColumnType.INTEGER)
+        ci_num = ColumnInfo(name="num", type=ColumnType.INT)
         ci_cat = ColumnInfo(name="cat", type=ColumnType.CATEGORICAL)
         ci_dt = ColumnInfo(name="dt", type=ColumnType.DATETIME)
         out_num = get_data_quality_for_column(df, "num", column_info=ci_num)
@@ -221,15 +335,16 @@ class TestUnitColumnQuality:
     def test_categorical_all_nulls(self) -> None:
         """Covers categorical handler with all nulls."""
         df = pl.DataFrame({"col": [None, None, None]})
-        res = column_data_quality_categorical_handler(df, "col")
+        ci = ColumnInfo(name="col", type=ColumnType.CATEGORICAL)
+        res = column_data_quality_categorical_handler(df, "col", column_info=ci)
         assert res["has_low_variation"] is True
         assert res["outlier_count"] == 0
         assert res["outlier_rate"] == 0.0
 
     def test_categorical_broken_column_info(self) -> None:
         """Covers categorical handler with malformed ColumnInfo."""
-        ci = ColumnInfo(name="col")
-        ci.category_counts = None  # type: ignore[assignment]
+        ci = ColumnInfo(name="col", type=ColumnType.CATEGORICAL)
+        ci.histogram = {}  # Empty histogram instead of None
         df = pl.DataFrame({"col": ["a", "b", "c"]})
         res = column_data_quality_categorical_handler(df, "col", column_info=ci)
         assert isinstance(res, dict)
@@ -237,20 +352,23 @@ class TestUnitColumnQuality:
     def test_temporal_non_convertible_column(self) -> None:
         """Covers temporal handler conversion error."""
         df = pl.DataFrame({"col": ["not_date", "also_not_a_date"]})
-        res = column_data_quality_temporal_handler(df, "col")
+        ci = ColumnInfo(name="col", type=ColumnType.DATETIME)
+        res = column_data_quality_temporal_handler(df, "col", column_info=ci)
         assert isinstance(res, dict)
 
     def test_temporal_all_nulls(self) -> None:
         """Covers temporal handler with all nulls."""
         df = pl.DataFrame({"col": [None, None, None]})
-        res = column_data_quality_temporal_handler(df, "col")
+        ci = ColumnInfo(name="col", type=ColumnType.DATETIME)
+        res = column_data_quality_temporal_handler(df, "col", column_info=ci)
         assert isinstance(res, dict)
 
     def test_temporal_one_unique(self) -> None:
         """Covers temporal handler unique_count <= 1."""
         df = pl.DataFrame({"col": ["2022-01-01"] * 5})
         df = df.with_columns(pl.col("col").str.to_date().alias("col"))
-        res = column_data_quality_temporal_handler(df, "col")
+        ci = ColumnInfo(name="col", type=ColumnType.DATE)
+        res = column_data_quality_temporal_handler(df, "col", column_info=ci)
         assert res["has_low_variation"] is True
 
     def test_numeric_handler_missing_column(self) -> None:

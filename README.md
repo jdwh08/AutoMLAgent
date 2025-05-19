@@ -2,8 +2,10 @@
 
 Prototype modular, agentic AutoML system for (tabular datasets for now).
 
+[![CI](https://github.com/jdwh08/AutoMLAgent/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/jdwh08/AutoMLAgent/actions/workflows/ci.yaml)
 [![codecov](https://codecov.io/gh/jdwh08/AutoMLAgent/branch/main/graph/badge.svg)](https://codecov.io/gh/jdwh08/AutoMLAgent)
- [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 **Research Question**: Can agents achieve similar levels of performance as
 manual model training on benchmark /  Kaggleish datasets?
@@ -62,11 +64,25 @@ For now, we focus only on non-competition tabular kaggle datasets which I rememb
 
 ## Papers and References to Consider
 
+### General
+
 - AutoML <https://www.automl.org/wp-content/uploads/2019/05/AutoML_Book.pdf>
-- NNI <https://github.com/microsoft/nni>
-- Auto sklearn <https://github.com/automl/auto-sklearn/tree/development>
+
+### EDA
+
+- <https://github.com/mstaniak/autoEDA-resources>
+  - DataPrep EDA <https://arxiv.org/pdf/2104.00841>
+  - Smart EDA <https://arxiv.org/pdf/1903.04754>
+
+### Feature Engineering
+
 - Feature Engine <https://feature-engine.trainindata.com/en/latest/index.html>
 - Feature Tools <https://github.com/alteryx/featuretools>
+
+### Model Selection
+
+- NNI for NN <https://github.com/microsoft/nni>
+- Auto sklearn <https://github.com/automl/auto-sklearn/tree/development>
 - TPOT <https://github.com/EpistasisLab/tpot>
 - AILink <https://github.com/alibaba/Alink>
 - MLJar <https://github.com/mljar/mljar-supervised>
